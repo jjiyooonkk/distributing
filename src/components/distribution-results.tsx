@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import GroupCard from './group-card';
 import PersonChip from './person-chip';
 import ResultsTable from './results-table';
+import { toast } from 'sonner';
 import type { DistributionResult, PersonRow, ColumnMeta } from '@/types';
 
 interface ResultsProps {
@@ -114,6 +115,18 @@ export default function DistributionResults({
     });
   }
 
+  function buildTsvData(): string {
+    const headers = ['배정 그룹', ...filteredColumns.map((c) => c.name)];
+    const lines = [headers.join('\t')];
+    for (const group of results.groups) {
+      for (const member of group.members) {
+        const cells = [group.name, ...filteredColumns.map((c) => member[c.name] || '')];
+        lines.push(cells.join('\t'));
+      }
+    }
+    return lines.join('\n');
+  }
+
   function exportToExcel() {
     const rows: Record<string, string>[] = [];
     for (const group of results.groups) {
@@ -131,6 +144,17 @@ export default function DistributionResults({
     XLSX.writeFile(wb, `배정결과_${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
+  async function exportToGoogleSheets() {
+    const tsv = buildTsvData();
+    try {
+      await navigator.clipboard.writeText(tsv);
+      toast.success('데이터가 클립보드에 복사되었습니다. 새 시트에서 Ctrl+V (Mac: ⌘V)로 붙여넣기하세요.');
+    } catch {
+      toast.error('클립보드 복사에 실패했습니다.');
+    }
+    window.open('https://sheets.new', '_blank');
+  }
+
   const totalPeople = results.groups.reduce((s, g) => s + g.members.length, 0);
 
   return (
@@ -142,8 +166,11 @@ export default function DistributionResults({
           {new Date(results.timestamp).toLocaleString('ko-KR')}
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportToGoogleSheets}>
+            구글 시트로 내보내기
+          </Button>
           <Button variant="outline" size="sm" onClick={exportToExcel}>
-            스프레드시트 다운로드
+            엑셀 다운로드
           </Button>
           <Button variant="outline" size="sm" onClick={onNotify}>
             결과 발송
