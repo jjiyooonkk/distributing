@@ -141,14 +141,42 @@ export default function ResultsTable({
     return '';
   }
 
+  const sortOptions = [
+    { value: '__group__', label: '배정 그룹' },
+    ...shownCols.map((c) => ({ value: c.name, label: c.name })),
+  ];
+
   return (
     <div className="space-y-3">
-      <Input
-        placeholder="검색 (이름, 그룹, 값...)"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="max-w-xs h-8"
-      />
+      <div className="flex items-center gap-2 flex-wrap">
+        <Input
+          placeholder="검색..."
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="max-w-[200px] h-8"
+        />
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span>정렬:</span>
+          <Select value={sortCol} onValueChange={(v) => v && setSortCol(v)}>
+            <SelectTrigger className="h-7 w-auto min-w-[80px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sortOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <button
+            onClick={() => setSortAsc(!sortAsc)}
+            className="px-2 py-1 rounded border text-xs hover:bg-muted"
+          >
+            {sortAsc ? '↑ 오름차순' : '↓ 내림차순'}
+          </button>
+        </div>
+      </div>
 
       <div className="border rounded-lg overflow-auto max-h-[600px]">
         <Table>
