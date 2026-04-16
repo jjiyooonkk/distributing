@@ -9,9 +9,11 @@ import FileUpload from '@/components/file-upload';
 import DataPreview from '@/components/data-preview';
 import ColumnConfig from '@/components/column-config';
 import DistributionResults from '@/components/distribution-results';
+import ScheduleConfigComponent from '@/components/schedule-config';
+import ScheduleResults from '@/components/schedule-results';
 import NotifyDialog from '@/components/notify-dialog';
 import ConfigSummary from '@/components/config-summary';
-import type { Project, PersonRow, ColumnMeta, DistributionConfig, DistributionResult } from '@/types';
+import type { Project, PersonRow, ColumnMeta, DistributionConfig, DistributionResult, ScheduleConfig, ScheduleResult, isScheduleResult, isScheduleConfig } from '@/types';
 import { toast } from 'sonner';
 
 type Step = 'upload' | 'configure' | 'results';
@@ -71,7 +73,7 @@ export default function ProjectPage({
     }
   }
 
-  async function handleDistribute(config: DistributionConfig) {
+  async function handleDistribute(config: DistributionConfig | ScheduleConfig) {
     setDistributing(true);
     try {
       const res = await fetch('/api/distribute', {
@@ -81,10 +83,9 @@ export default function ProjectPage({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '분배 실패');
-      const results = data as DistributionResult;
-      setProject((prev) => prev ? { ...prev, config, results } : prev);
+      setProject((prev) => prev ? { ...prev, config, results: data } : prev);
       setStep('results');
-      toast.success('분배가 완료되었습니다!');
+      toast.success(project?.projectMode === 'schedule' ? '숙소 배정이 완료되었습니다!' : '분배가 완료되었습니다!');
     } catch (e) {
       toast.error(`분배 실패: ${e instanceof Error ? e.message : '알 수 없는 오류'}`);
     } finally {
@@ -92,7 +93,7 @@ export default function ProjectPage({
     }
   }
 
-  async function handleResultsUpdate(results: DistributionResult) {
+  async function handleResultsUpdate(results: DistributionResult | ScheduleResult) {
     setProject((prev) => prev ? { ...prev, results } : prev);
     // Save to server
     await fetch(`/api/project/${code}`, {
@@ -181,23 +182,44 @@ export default function ProjectPage({
         <div className="space-y-4">
           <DataPreview rows={project.data} columns={project.columns} />
           <Separator />
-          <ColumnConfig
-            columns={project.columns}
-            onSubmit={handleDistribute}
-            loading={distributing}
-          />
+          {project.projectMode === 'schedule' ? (
+            <ScheduleConfigComponent
+              columns={project.columns}
+              data={project.data}
+              onSubmit={handleDistribute}
+              loading={distributing}
+            />
+          ) : (
+            <ColumnConfig
+              columns={project.columns}
+              onSubmit={handleDistribute}
+              loading={distributing}
+            />
+          )}
         </div>
       )}
 
       {step === 'results' && project.results && (
         <>
-          {project.config && <ConfigSummary config={project.config} />}
-          <DistributionResults
-            results={project.results}
-            columns={project.columns}
-            onUpdate={handleResultsUpdate}
-            onNotify={() => setNotifyOpen(true)}
-          />
+          {project.config && !('arrivalColumn' in project.config) && (
+            <ConfigSummary config={project.config as DistributionConfig} />
+          )}
+          {'assignments' in project.results ? (
+            <ScheduleResults
+              results={project.results as ScheduleResult}
+              data={project.data}
+              columns={project.columns}
+              onUpdate={handleResultsUpdate as (r: ScheduleResult) => void}
+              onNotify={() => setNotifyOpen(true)}
+            />
+          ) : (
+            <DistributionResults
+              results={project.results as DistributionResult}
+              columns={project.columns}
+              onUpdate={handleResultsUpdate as (r: DistributionResult) => void}
+              onNotify={() => setNotifyOpen(true)}
+            />
+          )}
           <NotifyDialog
             open={notifyOpen}
             onClose={() => setNotifyOpen(false)}

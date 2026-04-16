@@ -90,14 +90,55 @@ export interface DistributionResult {
   timestamp: string;
 }
 
+// --- Schedule-based assignment types ---
+
+export interface RoomDef {
+  name: string;
+  capacity: number;
+}
+
+export interface ScheduleConfig {
+  arrivalColumn: string;
+  departureColumn: string;
+  rooms: RoomDef[];
+  rules: ColumnRule[];
+  baseYear?: number;
+}
+
+export interface ScheduleAssignment {
+  date: string;       // "5/8"
+  roomName: string;
+  personId: string;
+}
+
+export interface ScheduleResult {
+  assignments: ScheduleAssignment[];
+  dates: string[];    // all dates in range
+  rooms: string[];    // room names
+  timestamp: string;
+}
+
+// --- Project ---
+
+export type ProjectMode = 'group' | 'schedule';
+
 export interface Project {
   code: string;
   name: string;
+  projectMode: ProjectMode;
   createdAt: string;
   expiresAt: string;
   status: 'active' | 'completed';
   data: PersonRow[];
   columns: ColumnMeta[];
-  config: DistributionConfig | null;
-  results: DistributionResult | null;
+  config: DistributionConfig | ScheduleConfig | null;
+  results: DistributionResult | ScheduleResult | null;
+}
+
+export function isScheduleResult(r: unknown): r is ScheduleResult {
+  return r !== null && typeof r === 'object' && 'assignments' in (r as Record<string, unknown>);
+}
+
+export function isScheduleConfig(c: unknown): c is ScheduleConfig {
+  return c !== null && typeof c === 'object' && 'arrivalColumn' in (c as Record<string, unknown>);
 }

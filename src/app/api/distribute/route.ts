@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getProject, updateProject } from '@/lib/project';
 import { distribute } from '@/lib/distribution';
-import type { DistributionConfig } from '@/types';
+import { distributeBySchedule } from '@/lib/distribution/schedule-assign';
+import type { DistributionConfig, ScheduleConfig, isScheduleConfig } from '@/types';
 
 export async function POST(request: Request) {
   try {
-    const { code, config }: { code: string; config: DistributionConfig } =
-      await request.json();
+    const { code, config } = await request.json();
 
     const project = await getProject(code);
     if (!project) {
@@ -16,16 +16,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '데이터를 먼저 업로드해주세요.' }, { status: 400 });
     }
 
-    const groups = distribute(project.data, config, project.columns);
-
-    const results = {
-      groups,
-      timestamp: new Date().toISOString(),
-    };
-
-    await updateProject(code, { config, results });
-
-    return NextResponse.json(results);
+    if (project.projectMode === 'schedule') {
+      const schedConfig = config as ScheduleConfig;
+      const results = distributeBySchedule(project.data, schedConfig, project.columns);
+      await updateProject(code, { config: schedConfig, results });
+      return NextResponse.json(results);
+    } else {
+      const groupConfig = config as DistributionConfig;
+      const groups = distribute(project.data, groupConfig, project.columns);
+      const results = { groups, timestamp: new Date().toISOString() };
+      await updateProject(code, { config: groupConfig, results });
+      return NextResponse.json(results);
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('POST /api/distribute error:', msg);

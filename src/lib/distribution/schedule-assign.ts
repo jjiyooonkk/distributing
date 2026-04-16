@@ -1,0 +1,189 @@
+import type {
+  PersonRow,
+  ScheduleConfig,
+  ScheduleResult,
+  ScheduleAssignment,
+  ColumnMeta,
+  PinRule,
+  SpreadRule,
+  ExcludeRule,
+  EnsureRule,
+} from '@/types';
+import { parseKoreanDateTime, computeStayNights, formatDate } from '../date-parse';
+
+interface PersonSchedule {
+  person: PersonRow;
+  nights: string[];
+}
+
+export function distributeBySchedule(
+  people: PersonRow[],
+  config: ScheduleConfig,
+  columns: ColumnMeta[]
+): ScheduleResult {
+  const { arrivalColumn, departureColumn, rooms, rules, baseYear } = config;
+
+  // Parse each person's schedule
+  const schedules: PersonSchedule[] = [];
+  for (const person of people) {
+    const arrival = parseKoreanDateTime(person[arrivalColumn] || '', baseYear);
+    const departure = parseKoreanDateTime(person[departureColumn] || '', baseYear);
+    if (!arrival || !departure) continue;
+    const nights = computeStayNights(arrival, departure);
+    if (nights.length > 0) {
+      schedules.push({ person, nights });
+    }
+  }
+
+  // Derive all dates
+  const allDatesSet = new Set<string>();
+  for (const s of schedules) {
+    for (const n of s.nights) allDatesSet.add(n);
+  }
+  const dates = [...allDatesSet].sort((a, b) => {
+    const [am, ad] = a.split('/').map(Number);
+    const [bm, bd] = b.split('/').map(Number);
+    return am !== bm ? am - bm : ad - bd;
+  });
+
+  const roomNames = rooms.map((r) => r.name);
+
+  // Extract rules
+  const pinRules = rules.filter((r) => r.type === 'pin' && 'value' in r && (r as PinRule).value) as PinRule[];
+  const spreadRules = rules.filter((r) => r.type === 'spread') as SpreadRule[];
+  const excludeRules = rules.filter((r) => r.type === 'exclude' && 'value' in r && (r as ExcludeRule).value) as ExcludeRule[];
+  const ensureRules = rules.filter((r) => r.type === 'ensure' && 'value' in r && (r as EnsureRule).value) as EnsureRule[];
+
+  const assignments: ScheduleAssignment[] = [];
+
+  // Track previous night's room per person for stability
+  const prevRoom = new Map<string, string>();
+
+  for (const date of dates) {
+    // Who is present this night?
+    const present = schedules
+      .filter((s) => s.nights.includes(date))
+      .map((s) => s.person);
+
+    // Room assignment for this night
+    const roomMembers: Map<string, PersonRow[]> = new Map();
+    for (const r of roomNames) roomMembers.set(r, []);
+
+    // Phase 1: Pin rules
+    const remaining: PersonRow[] = [];
+    for (const person of present) {
+      let pinned = false;
+      for (const rule of pinRules) {
+        if (person[rule.columnName] === rule.value) {
+          const target = roomMembers.get(rule.targetGroup);
+          if (target) {
+            const cap = rooms.find((r) => r.name === rule.targetGroup)?.capacity || Infinity;
+            if (target.length < cap) {
+              target.push(person);
+              pinned = true;
+              break;
+            }
+          }
+        }
+      }
+      if (!pinned) remaining.push(person);
+    }
+
+    // Phase 2: Ensure rules
+    const ensuredIds = new Set<string>();
+    for (const rule of ensureRules) {
+      const candidates = remaining.filter((p) => p[rule.columnName] === rule.value);
+      for (const [roomName, members] of roomMembers) {
+        const currentCount = members.filter((m) => m[rule.columnName] === rule.value).length;
+        const needed = rule.minPerGroup - currentCount;
+        for (let n = 0; n < needed; n++) {
+          const candidate = candidates.find((c) => !ensuredIds.has(c.id));
+          if (!candidate) break;
+          const cap = rooms.find((r) => r.name === roomName)?.capacity || Infinity;
+          if (members.length < cap) {
+            members.push(candidate);
+            ensuredIds.add(candidate.id);
+          }
+        }
+      }
+    }
+
+    const stillRemaining = remaining.filter((p) => !ensuredIds.has(p.id));
+
+    // Shuffle for fairness
+    for (let i = stillRemaining.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [stillRemaining[i], stillRemaining[j]] = [stillRemaining[j], stillRemaining[i]];
+    }
+
+    // Phase 3: Greedy assignment
+    for (const person of stillRemaining) {
+      let bestRoom = '';
+      let bestScore = -Infinity;
+
+      for (const [roomName, members] of roomMembers) {
+        const cap = rooms.find((r) => r.name === roomName)?.capacity || Infinity;
+        if (members.length >= cap) continue;
+
+        // Exclude check
+        const excluded = excludeRules.some(
+          (rule) => person[rule.columnName] === rule.value && roomName === rule.excludeGroup
+        );
+        if (excluded) continue;
+
+        let score = 0;
+
+        // Spread: penalize rooms with same value
+        for (const rule of spreadRules) {
+          const val = person[rule.columnName] || '';
+          const count = members.filter((m) => m[rule.columnName] === val).length;
+          score -= count * rule.weight;
+        }
+
+        // Stability: bonus for staying in same room as last night
+        const prev = prevRoom.get(person.id);
+        if (prev === roomName) {
+          score += 15; // strong stability bonus
+        }
+
+        // Balance: prefer less full rooms
+        score -= members.length * 0.5;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestRoom = roomName;
+        }
+      }
+
+      // Fallback: find least full room
+      if (!bestRoom) {
+        let minSize = Infinity;
+        for (const [roomName, members] of roomMembers) {
+          if (members.length < minSize) {
+            minSize = members.length;
+            bestRoom = roomName;
+          }
+        }
+      }
+
+      if (bestRoom) {
+        roomMembers.get(bestRoom)!.push(person);
+      }
+    }
+
+    // Record assignments and update prevRoom
+    for (const [roomName, members] of roomMembers) {
+      for (const person of members) {
+        assignments.push({ date, roomName, personId: person.id });
+        prevRoom.set(person.id, roomName);
+      }
+    }
+  }
+
+  return {
+    assignments,
+    dates,
+    rooms: roomNames,
+    timestamp: new Date().toISOString(),
+  };
+}

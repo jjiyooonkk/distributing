@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import type { ProjectMode } from '@/types';
 
 export default function HomePage() {
   const router = useRouter();
   const [projectName, setProjectName] = useState('');
+  const [projectMode, setProjectMode] = useState<ProjectMode>('group');
   const [projectCode, setProjectCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,7 +24,7 @@ export default function HomePage() {
       const res = await fetch('/api/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: projectName.trim() }),
+        body: JSON.stringify({ name: projectName.trim(), mode: projectMode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -81,6 +83,30 @@ export default function HomePage() {
               onChange={(e) => setProjectName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setProjectMode('group')}
+                className={`p-2.5 rounded-lg border text-left transition-colors ${
+                  projectMode === 'group'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-muted-foreground/50'
+                }`}
+              >
+                <div className="font-medium text-sm">조 편성</div>
+                <div className="text-xs text-muted-foreground">그룹/팀 나누기</div>
+              </button>
+              <button
+                onClick={() => setProjectMode('schedule')}
+                className={`p-2.5 rounded-lg border text-left transition-colors ${
+                  projectMode === 'schedule'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-muted-foreground/50'
+                }`}
+              >
+                <div className="font-medium text-sm">기간별 배정</div>
+                <div className="text-xs text-muted-foreground">숙소/스텝 배정</div>
+              </button>
+            </div>
             <Button
               className="w-full"
               onClick={handleCreate}

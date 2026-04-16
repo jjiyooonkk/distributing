@@ -1,6 +1,6 @@
 import { customAlphabet } from 'nanoid';
 import { getRedis } from './redis';
-import type { Project } from '@/types';
+import type { Project, ProjectMode } from '@/types';
 
 const generateCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6);
 
@@ -37,12 +37,13 @@ async function memTtl(key: string): Promise<number> {
   return Math.max(0, Math.floor((entry.expiresAt - Date.now()) / 1000));
 }
 
-export async function createProject(name: string): Promise<Project> {
+export async function createProject(name: string, mode: ProjectMode = 'group'): Promise<Project> {
   const code = generateCode();
   const now = new Date().toISOString();
   const project: Project = {
     code,
     name,
+    projectMode: mode,
     createdAt: now,
     expiresAt: new Date(Date.now() + PROJECT_TTL * 1000).toISOString(),
     status: 'active',

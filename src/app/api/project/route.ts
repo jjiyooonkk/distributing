@@ -3,11 +3,11 @@ import { createProject, getProject } from '@/lib/project';
 
 export async function POST(request: Request) {
   try {
-    const { name } = await request.json();
+    const { name, mode } = await request.json();
     if (!name || typeof name !== 'string') {
       return NextResponse.json({ error: '프로젝트 이름을 입력해주세요.' }, { status: 400 });
     }
-    const project = await createProject(name.trim());
+    const project = await createProject(name.trim(), mode || 'group');
     return NextResponse.json(project);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

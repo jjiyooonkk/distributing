@@ -24,6 +24,9 @@ export async function POST(request: Request) {
     let sent = 0;
     let failed = 0;
 
+    if (!('groups' in project.results)) {
+      return NextResponse.json({ error: '기간별 배정 프로젝트는 아직 발송을 지원하지 않습니다.' }, { status: 400 });
+    }
     for (const group of project.results.groups) {
       for (const member of group.members) {
         const contact = member[contactColumn];
