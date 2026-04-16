@@ -273,7 +273,7 @@ export default function DistributionResults({
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {results.groups.map((group) => (
-                <GroupCard key={group.id} group={group} columns={filteredColumns} />
+                <GroupCard key={group.id} group={group} columns={filteredColumns} allColumns={columns} />
               ))}
             </div>
             <DragOverlay>
