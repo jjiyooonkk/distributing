@@ -10,6 +10,7 @@ import DataPreview from '@/components/data-preview';
 import ColumnConfig from '@/components/column-config';
 import DistributionResults from '@/components/distribution-results';
 import NotifyDialog from '@/components/notify-dialog';
+import ConfigSummary from '@/components/config-summary';
 import type { Project, PersonRow, ColumnMeta, DistributionConfig, DistributionResult } from '@/types';
 import { toast } from 'sonner';
 
@@ -190,6 +191,7 @@ export default function ProjectPage({
 
       {step === 'results' && project.results && (
         <>
+          {project.config && <ConfigSummary config={project.config} />}
           <DistributionResults
             results={project.results}
             columns={project.columns}
