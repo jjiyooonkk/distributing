@@ -27,7 +27,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(results);
   } catch (e) {
-    console.error('POST /api/distribute error:', e);
-    return NextResponse.json({ error: '분배 중 오류가 발생했습니다.' }, { status: 500 });
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('POST /api/distribute error:', msg);
+    return NextResponse.json({ error: `분배 실패: ${msg}` }, { status: 500 });
   }
 }
