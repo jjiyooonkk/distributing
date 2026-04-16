@@ -145,14 +145,48 @@ export default function DistributionResults({
   }
 
   async function exportToGoogleSheets() {
-    const tsv = buildTsvData();
-    try {
-      await navigator.clipboard.writeText(tsv);
-      toast.success('데이터가 클립보드에 복사되었습니다. 새 시트에서 Ctrl+V (Mac: ⌘V)로 붙여넣기하세요.');
-    } catch {
-      toast.error('클립보드 복사에 실패했습니다.');
+    const headers = ['배정 그룹', ...filteredColumns.map((c) => c.name)];
+    const rows: string[][] = [];
+    for (const group of results.groups) {
+      for (const member of group.members) {
+        rows.push([group.name, ...filteredColumns.map((c) => member[c.name] || '')]);
+      }
     }
-    window.open('https://sheets.new', '_blank');
+
+    // Build HTML table for rich clipboard (Google Sheets handles this perfectly)
+    const html = `<table>
+      <tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>
+      ${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('\n')}
+    </table>`;
+
+    // Also build plain text TSV as fallback
+    const tsv = [headers.join('\t'), ...rows.map((r) => r.join('\t'))].join('\n');
+
+    try {
+      // Copy both HTML and plain text to clipboard
+      const clipboardItem = new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([tsv], { type: 'text/plain' }),
+      });
+      await navigator.clipboard.write([clipboardItem]);
+    } catch {
+      // Fallback: plain text copy
+      try {
+        await navigator.clipboard.writeText(tsv);
+      } catch {
+        toast.error('클립보드 복사에 실패했습니다.');
+        return;
+      }
+    }
+
+    toast.success('데이터 복사 완료! 새 시트가 열리면 Ctrl+V (Mac: ⌘V)로 붙여넣기하세요.', {
+      duration: 8000,
+    });
+
+    // Small delay so toast is visible before tab switch
+    setTimeout(() => {
+      window.open('https://sheets.new', '_blank');
+    }, 500);
   }
 
   const totalPeople = results.groups.reduce((s, g) => s + g.members.length, 0);
