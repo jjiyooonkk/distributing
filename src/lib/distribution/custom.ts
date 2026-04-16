@@ -69,11 +69,11 @@ export function distributeCustom(
   config: DistributionConfig
 ): Group[] {
   const groups = createGroups(config);
-  const pinRules = config.rules.filter((r): r is PinRule => r.type === 'pin' && r.value);
+  const pinRules = config.rules.filter((r): r is PinRule => r.type === 'pin' && !!r.value);
   const spreadRules = config.rules.filter((r): r is SpreadRule => r.type === 'spread');
   const clusterRules = config.rules.filter((r): r is ClusterRule => r.type === 'cluster');
-  const ensureRules = config.rules.filter((r): r is EnsureRule => r.type === 'ensure' && r.value);
-  const excludeRules = config.rules.filter((r): r is ExcludeRule => r.type === 'exclude' && r.value);
+  const ensureRules = config.rules.filter((r): r is EnsureRule => r.type === 'ensure' && !!r.value);
+  const excludeRules = config.rules.filter((r): r is ExcludeRule => r.type === 'exclude' && !!r.value);
 
   const remaining: PersonRow[] = [];
 

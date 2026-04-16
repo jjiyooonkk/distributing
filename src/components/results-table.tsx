@@ -33,16 +33,27 @@ export default function ResultsTable({
   onMove,
 }: ResultsTableProps) {
   const hakbunCol = columns.find((c) =>
-    ['학번', '학생번호', 'student_id', 'StudentID'].includes(c.name)
+    c.name.includes('학번') || c.name.includes('학생번호') || c.name.toLowerCase().includes('student')
   );
   const nameCol = columns.find((c) =>
-    ['이름', 'name', 'Name', '성명'].includes(c.name)
+    c.name.includes('이름') || c.name.includes('성명') || c.name.toLowerCase() === 'name'
   );
   const [sortCol, setSortCol] = useState<string>(hakbunCol ? hakbunCol.name : '__group__');
   const [sortAsc, setSortAsc] = useState(true);
   const [filter, setFilter] = useState('');
 
-  const shownCols = columns.filter((c) => visibleColumns.has(c.name));
+  // Show selected columns, but put 학번 and 이름 first
+  const shownCols = (() => {
+    const selected = columns.filter((c) => visibleColumns.has(c.name));
+    const priority: typeof selected = [];
+    const rest: typeof selected = [];
+    for (const col of selected) {
+      if (hakbunCol && col.name === hakbunCol.name) priority.unshift(col);
+      else if (nameCol && col.name === nameCol.name) priority.push(col);
+      else rest.push(col);
+    }
+    return [...priority, ...rest];
+  })();
   const groupNames = results.groups.map((g) => g.name);
 
   // Flatten groups into rows with group info
