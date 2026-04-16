@@ -14,6 +14,25 @@ interface GroupCardProps {
 export default function GroupCard({ group, columns }: GroupCardProps) {
   const { setNodeRef, isOver } = useDroppable({ id: group.id });
 
+  // Sort members by 학번 asc, then 이름
+  const hakbunCol = columns.find((c) =>
+    c.name.includes('학번') || c.name.includes('학생번호') || c.name.toLowerCase().includes('student')
+  );
+  const nameCol = columns.find((c) =>
+    c.name.includes('이름') || c.name.includes('성명') || c.name.toLowerCase() === 'name'
+  );
+  const sortedMembers = [...group.members].sort((a, b) => {
+    if (hakbunCol) {
+      const ha = Number(a[hakbunCol.name] || '0');
+      const hb = Number(b[hakbunCol.name] || '0');
+      if (ha !== hb) return ha - hb;
+    }
+    if (nameCol) {
+      return (a[nameCol.name] || '').localeCompare(b[nameCol.name] || '', 'ko');
+    }
+    return 0;
+  });
+
   // Show top stats for category columns
   const categoryColumns = columns.filter((c) => c.type === 'category').slice(0, 3);
 
@@ -47,7 +66,7 @@ export default function GroupCard({ group, columns }: GroupCardProps) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-1.5">
-          {group.members.map((person) => (
+          {sortedMembers.map((person) => (
             <PersonChip key={person.id} person={person} columns={columns} />
           ))}
         </div>
