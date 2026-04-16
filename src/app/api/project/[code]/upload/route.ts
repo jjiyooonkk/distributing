@@ -29,7 +29,8 @@ export async function POST(
 
     return NextResponse.json(updated);
   } catch (e) {
-    console.error('POST /api/project/[code]/upload error:', e);
-    return NextResponse.json({ error: '업로드에 실패했습니다.' }, { status: 500 });
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('POST /api/project/[code]/upload error:', msg);
+    return NextResponse.json({ error: `업로드 실패: ${msg}` }, { status: 500 });
   }
 }

@@ -60,13 +60,13 @@ export default function ProjectPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows, columns }),
       });
-      const data: Project = await res.json();
-      if (!res.ok) throw new Error('업로드 실패');
-      setProject(data);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '업로드 실패');
+      setProject(data as Project);
       setStep('configure');
       toast.success(`${rows.length}명 데이터가 업로드되었습니다.`);
-    } catch {
-      toast.error('데이터 업로드에 실패했습니다.');
+    } catch (e) {
+      toast.error(`데이터 업로드 실패: ${e instanceof Error ? e.message : '알 수 없는 오류'}`);
     }
   }
 
@@ -78,13 +78,14 @@ export default function ProjectPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, config }),
       });
-      const results: DistributionResult = await res.json();
-      if (!res.ok) throw new Error('분배 실패');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '분배 실패');
+      const results = data as DistributionResult;
       setProject((prev) => prev ? { ...prev, config, results } : prev);
       setStep('results');
       toast.success('분배가 완료되었습니다!');
-    } catch {
-      toast.error('분배 중 오류가 발생했습니다.');
+    } catch (e) {
+      toast.error(`분배 실패: ${e instanceof Error ? e.message : '알 수 없는 오류'}`);
     } finally {
       setDistributing(false);
     }
