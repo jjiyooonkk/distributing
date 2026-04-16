@@ -38,7 +38,7 @@ export default function ResultsTable({
   const nameCol = columns.find((c) =>
     c.name.includes('이름') || c.name.includes('성명') || c.name.toLowerCase() === 'name'
   );
-  const [sortCol, setSortCol] = useState<string>(hakbunCol ? hakbunCol.name : '__group__');
+  const [sortCol, setSortCol] = useState<string>('__group__');
   const [sortAsc, setSortAsc] = useState(true);
   const [filter, setFilter] = useState('');
 
@@ -97,14 +97,16 @@ export default function ResultsTable({
       const primary = sortAsc ? cmp : -cmp;
       if (primary !== 0) return primary;
 
-      // Secondary sort: 학번 오름차순 → 이름 오름차순
-      if (hakbunCol && sortCol !== hakbunCol.name) {
+      // Secondary: always sort by 학번 오름차순 within same primary
+      if (hakbunCol) {
         const ha = Number(a.person[hakbunCol.name] || '0');
         const hb = Number(b.person[hakbunCol.name] || '0');
         if (ha !== hb) return ha - hb;
       }
-      if (nameCol && sortCol !== nameCol.name) {
-        return (a.person[nameCol.name] || '').localeCompare(b.person[nameCol.name] || '', 'ko');
+      // Tertiary: 이름 오름차순
+      if (nameCol) {
+        const nameCmp = (a.person[nameCol.name] || '').localeCompare(b.person[nameCol.name] || '', 'ko');
+        if (nameCmp !== 0) return nameCmp;
       }
       return 0;
     });
