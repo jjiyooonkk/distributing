@@ -24,6 +24,7 @@ import type {
   ClusterRule,
   EnsureRule,
   ExcludeRule,
+  RatioRule,
   GroupCapacity,
 } from '@/types';
 
@@ -115,6 +116,17 @@ export default function ColumnConfig({ columns, onSubmit, loading }: ColumnConfi
         ...rules,
         { type: 'exclude', columnName: col, value: '', excludeGroup: groupNameList[0] || '1조' } as ExcludeRule,
       ]);
+    } else if (type === 'ratio') {
+      // Auto-populate ratios from unique values with equal weight
+      const colMeta = columns.find((c) => c.name === col);
+      const ratios: Record<string, number> = {};
+      for (const v of colMeta?.uniqueValues || []) {
+        ratios[v] = 1;
+      }
+      setRules([
+        ...rules,
+        { type: 'ratio', columnName: col, ratios, weight: 5 } as RatioRule,
+      ]);
     }
   }
 
@@ -152,6 +164,7 @@ export default function ColumnConfig({ columns, onSubmit, loading }: ColumnConfi
     cluster: { label: '모음 배정', color: 'text-green-600', desc: '비슷한 값끼리 같은 그룹' },
     ensure: { label: '보장 배정', color: 'text-purple-600', desc: '특정 값이 각 그룹에 최소 N명' },
     exclude: { label: '제외 배정', color: 'text-red-600', desc: '특정 값 → 특정 그룹에 배정 안 함' },
+    ratio: { label: '비율 배정', color: 'text-teal-600', desc: '각 그룹 내 값 비율 지정 (성비, 학번 등)' },
   };
 
   return (
@@ -304,6 +317,9 @@ export default function ColumnConfig({ columns, onSubmit, loading }: ColumnConfi
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => addRule('exclude')}>
                   + 제외
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => addRule('ratio')}>
+                  + 비율
                 </Button>
               </div>
             </CardTitle>
@@ -531,6 +547,15 @@ export default function ColumnConfig({ columns, onSubmit, loading }: ColumnConfi
                     </p>
                   </>
                 )}
+
+                {/* Ratio rule specifics */}
+                {rule.type === 'ratio' && (
+                  <RatioRuleEditor
+                    rule={rule as RatioRule}
+                    column={columns.find((c) => c.name === rule.columnName)}
+                    onUpdate={(updates) => updateRule(i, updates)}
+                  />
+                )}
               </div>
             ))}
           </CardContent>
@@ -645,6 +670,71 @@ function ClusterRuleEditor({
 
       <p className="text-xs text-muted-foreground">
         같거나 비슷한 값을 가진 사람들을 같은 그룹에 배정합니다
+      </p>
+    </>
+  );
+}
+
+// --- Ratio Rule Editor ---
+function RatioRuleEditor({
+  rule,
+  column,
+  onUpdate,
+}: {
+  rule: RatioRule;
+  column?: ColumnMeta;
+  onUpdate: (updates: Record<string, unknown>) => void;
+}) {
+  const ratios = rule.ratios || {};
+  const totalRatio = Object.values(ratios).reduce((s, r) => s + r, 0);
+
+  function setRatio(val: string, num: number) {
+    onUpdate({ ratios: { ...ratios, [val]: Math.max(0, num) } });
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Label className="text-xs w-12 shrink-0">강도</Label>
+        <Input
+          type="number"
+          min={1}
+          max={10}
+          value={rule.weight}
+          onChange={(e) => onUpdate({ weight: Number(e.target.value) })}
+          className="w-16 h-8"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">값별 비율</Label>
+        <p className="text-xs text-muted-foreground">
+          각 값의 비율 숫자를 입력하세요 (예: 남=2, 여=1 → 각 그룹에서 남:여 ≈ 2:1)
+        </p>
+
+        <div className="space-y-1.5">
+          {(column?.uniqueValues || Object.keys(ratios)).map((val) => {
+            const r = ratios[val] ?? 1;
+            const pct = totalRatio > 0 ? ((r / totalRatio) * 100).toFixed(0) : '0';
+            return (
+              <div key={val} className="flex items-center gap-2">
+                <span className="text-sm w-24 truncate">{val}</span>
+                <Input
+                  type="number"
+                  min={0}
+                  value={r}
+                  onChange={(e) => setRatio(val, Number(e.target.value))}
+                  className="w-16 h-7 text-sm"
+                />
+                <span className="text-xs text-muted-foreground w-12">≈ {pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        각 그룹 내에서 이 비율에 최대한 가깝게 배정합니다
       </p>
     </>
   );

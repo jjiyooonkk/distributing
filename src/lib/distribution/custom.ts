@@ -7,6 +7,7 @@ import type {
   ClusterRule,
   EnsureRule,
   ExcludeRule,
+  RatioRule,
   GroupCapacity,
 } from '@/types';
 import { nanoid } from 'nanoid';
@@ -74,6 +75,7 @@ export function distributeCustom(
   const clusterRules = config.rules.filter((r): r is ClusterRule => r.type === 'cluster');
   const ensureRules = config.rules.filter((r): r is EnsureRule => r.type === 'ensure' && !!r.value);
   const excludeRules = config.rules.filter((r): r is ExcludeRule => r.type === 'exclude' && !!r.value);
+  const ratioRules = config.rules.filter((r): r is RatioRule => r.type === 'ratio');
 
   const remaining: PersonRow[] = [];
 
@@ -167,6 +169,19 @@ export function distributeCustom(
         score += clusterScore(group, rule, val) * rule.weight;
       }
 
+      // Ratio: penalize deviation from target ratios
+      for (const rule of ratioRules) {
+        const val = person[rule.columnName] || '';
+        const totalRatio = Object.values(rule.ratios).reduce((s, r) => s + r, 0);
+        const targetRatio = (rule.ratios[val] || 0) / (totalRatio || 1);
+        const currentTotal = group.members.length + 1;
+        const currentCount = group.members.filter(
+          (m) => m[rule.columnName] === val
+        ).length + 1;
+        const deviation = Math.abs(currentCount / currentTotal - targetRatio);
+        score -= deviation * rule.weight * 10;
+      }
+
       // Prefer smaller groups (balance)
       score -= group.members.length * 0.5;
 
@@ -226,15 +241,15 @@ export function distributeCustom(
     const idx2 = g2.members.indexOf(p2);
 
     // Calculate current score
-    const scoreBefore = calcGroupScore(g1, spreadRules, clusterRules, ensureRules) +
-      calcGroupScore(g2, spreadRules, clusterRules, ensureRules);
+    const scoreBefore = calcGroupScore(g1, spreadRules, clusterRules, ensureRules, ratioRules) +
+      calcGroupScore(g2, spreadRules, clusterRules, ensureRules, ratioRules);
 
     // Swap
     g1.members[idx1] = p2;
     g2.members[idx2] = p1;
 
-    const scoreAfter = calcGroupScore(g1, spreadRules, clusterRules, ensureRules) +
-      calcGroupScore(g2, spreadRules, clusterRules, ensureRules);
+    const scoreAfter = calcGroupScore(g1, spreadRules, clusterRules, ensureRules, ratioRules) +
+      calcGroupScore(g2, spreadRules, clusterRules, ensureRules, ratioRules);
 
     const delta = scoreAfter - scoreBefore;
 
@@ -270,7 +285,8 @@ function calcGroupScore(
   group: Group,
   spreadRules: SpreadRule[],
   clusterRules: ClusterRule[],
-  ensureRules: EnsureRule[]
+  ensureRules: EnsureRule[],
+  ratioRules: RatioRule[]
 ): number {
   let score = 0;
 
@@ -310,7 +326,19 @@ function calcGroupScore(
       (m) => m[rule.columnName] === rule.value
     ).length;
     if (count < rule.minPerGroup) {
-      score += (rule.minPerGroup - count) * 100; // heavy penalty
+      score += (rule.minPerGroup - count) * 100;
+    }
+  }
+
+  // Ratio penalty: penalize deviation from target ratios
+  for (const rule of ratioRules) {
+    const totalRatio = Object.values(rule.ratios).reduce((s, r) => s + r, 0);
+    if (totalRatio === 0 || group.members.length === 0) continue;
+    for (const [val, ratio] of Object.entries(rule.ratios)) {
+      const targetPct = ratio / totalRatio;
+      const actualCount = group.members.filter((m) => m[rule.columnName] === val).length;
+      const actualPct = actualCount / group.members.length;
+      score += Math.abs(actualPct - targetPct) * rule.weight * 5;
     }
   }
 

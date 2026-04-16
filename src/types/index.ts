@@ -57,7 +57,17 @@ export interface ExcludeRule {
   excludeGroup: string;  // 이 그룹에 배정하지 않음
 }
 
-export type ColumnRule = PinRule | SpreadRule | ClusterRule | EnsureRule | ExcludeRule;
+// "남녀 비율 2:1" 또는 "학번별 균등 비율" 같은 비율 배정
+export interface RatioRule {
+  type: 'ratio';
+  columnName: string;
+  // 값별 비율 (예: { "남": 2, "여": 1 } → 각 그룹에 남:여 = 2:1)
+  // 비어있으면 자동 균등 배분
+  ratios: Record<string, number>;
+  weight: number;
+}
+
+export type ColumnRule = PinRule | SpreadRule | ClusterRule | EnsureRule | ExcludeRule | RatioRule;
 
 export interface DistributionConfig {
   mode: 'random' | 'balanced' | 'schedule' | 'custom';
