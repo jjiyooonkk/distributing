@@ -44,7 +44,7 @@ export default function NotifyDialog({
   const [twilioAuthToken, setTwilioAuthToken] = useState('');
   const [twilioFromNumber, setTwilioFromNumber] = useState('');
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<{ sent: number; failed: number } | null>(null);
+  const [result, setResult] = useState<{ sent: number; failed: number; error?: string } | null>(null);
 
   async function handleSend() {
     setSending(true);
@@ -65,9 +65,13 @@ export default function NotifyDialog({
         }),
       });
       const data = await res.json();
-      setResult({ sent: data.sent, failed: data.failed });
-    } catch {
-      setResult({ sent: 0, failed: -1 });
+      if (!res.ok) {
+        setResult({ sent: 0, failed: -1, error: data.error || '발송 실패' });
+      } else {
+        setResult({ sent: data.sent ?? 0, failed: data.failed ?? 0 });
+      }
+    } catch (e) {
+      setResult({ sent: 0, failed: -1, error: e instanceof Error ? e.message : '네트워크 오류' });
     } finally {
       setSending(false);
     }
@@ -167,9 +171,9 @@ export default function NotifyDialog({
           </div>
 
           {result && (
-            <div className="text-sm p-3 rounded-md bg-muted">
-              {result.failed === -1
-                ? '발송 중 오류가 발생했습니다.'
+            <div className={`text-sm p-3 rounded-md ${result.error ? 'bg-destructive/10 text-destructive' : 'bg-muted'}`}>
+              {result.error
+                ? `오류: ${result.error}`
                 : `발송 완료: 성공 ${result.sent}건, 실패 ${result.failed}건`}
             </div>
           )}
