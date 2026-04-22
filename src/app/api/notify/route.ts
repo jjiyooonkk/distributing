@@ -23,6 +23,7 @@ export async function POST(request: Request) {
 
     let sent = 0;
     let failed = 0;
+    const errors: string[] = [];
 
     if ('assignments' in project.results) {
       // Schedule mode: send per-person schedule
@@ -65,20 +66,27 @@ export async function POST(request: Request) {
           message = message.replace(`{{${key}}}`, val || '');
         }
 
-        let ok = false;
-        if (channel === 'telegram') {
-          ok = await sendTelegram(telegramBotToken, contact, message);
-        } else if (channel === 'sms') {
-          ok = await sendSMS(twilioAccountSid, twilioAuthToken, twilioFromNumber, contact, message);
+        const result = channel === 'telegram'
+          ? await sendTelegram(telegramBotToken, contact, message)
+          : channel === 'sms'
+          ? { ok: await sendSMS(twilioAccountSid, twilioAuthToken, twilioFromNumber, contact, message) }
+          : { ok: false, error: '지원하지 않는 채널' };
+
+        if (typeof result === 'object' && 'ok' in result && result.ok) {
+          sent++;
+        } else {
+          failed++;
+          const name = person['이름'] || person['name'] || person['성명'] || contact;
+          const reason = typeof result === 'object' && 'error' in result ? result.error : '알 수 없음';
+          if (errors.length < 5) errors.push(`${name}: ${reason}`);
         }
-        if (ok) sent++; else failed++;
       }
     } else {
       // Group mode
       for (const group of project.results.groups) {
         for (const member of group.members) {
           const contact = member[contactColumn];
-          if (!contact) { failed++; continue; }
+          if (!contact) { failed++; errors.length < 5 && errors.push(`${member['이름'] || '?'}: 연락처 없음`); continue; }
 
           let message = messageTemplate
             .replace('{{group}}', group.name)
@@ -88,18 +96,25 @@ export async function POST(request: Request) {
             message = message.replace(`{{${key}}}`, val || '');
           }
 
-          let ok = false;
-          if (channel === 'telegram') {
-            ok = await sendTelegram(telegramBotToken, contact, message);
-          } else if (channel === 'sms') {
-            ok = await sendSMS(twilioAccountSid, twilioAuthToken, twilioFromNumber, contact, message);
+          const result = channel === 'telegram'
+            ? await sendTelegram(telegramBotToken, contact, message)
+            : channel === 'sms'
+            ? { ok: await sendSMS(twilioAccountSid, twilioAuthToken, twilioFromNumber, contact, message) }
+            : { ok: false, error: '지원하지 않는 채널' };
+
+          if (typeof result === 'object' && 'ok' in result && result.ok) {
+            sent++;
+          } else {
+            failed++;
+            const name = member['이름'] || member['name'] || contact;
+            const reason = typeof result === 'object' && 'error' in result ? result.error : '알 수 없음';
+            if (errors.length < 5) errors.push(`${name}: ${reason}`);
           }
-          if (ok) sent++; else failed++;
         }
       }
     }
 
-    return NextResponse.json({ sent, failed, total: sent + failed });
+    return NextResponse.json({ sent, failed, total: sent + failed, errors });
   } catch (e) {
     console.error('POST /api/notify error:', e);
     return NextResponse.json({ error: '발송 중 오류가 발생했습니다.' }, { status: 500 });

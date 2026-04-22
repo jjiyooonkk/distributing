@@ -68,7 +68,12 @@ export default function NotifyDialog({
       if (!res.ok) {
         setResult({ sent: 0, failed: -1, error: data.error || '발송 실패' });
       } else {
-        setResult({ sent: data.sent ?? 0, failed: data.failed ?? 0 });
+        const errMsg = data.errors?.length ? `\n${data.errors.join('\n')}` : '';
+        setResult({
+          sent: data.sent ?? 0,
+          failed: data.failed ?? 0,
+          error: data.failed > 0 ? errMsg : undefined,
+        });
       }
     } catch (e) {
       setResult({ sent: 0, failed: -1, error: e instanceof Error ? e.message : '네트워크 오류' });
@@ -171,10 +176,11 @@ export default function NotifyDialog({
           </div>
 
           {result && (
-            <div className={`text-sm p-3 rounded-md ${result.error ? 'bg-destructive/10 text-destructive' : 'bg-muted'}`}>
-              {result.error
-                ? `오류: ${result.error}`
-                : `발송 완료: 성공 ${result.sent}건, 실패 ${result.failed}건`}
+            <div className={`text-sm p-3 rounded-md whitespace-pre-wrap ${result.failed !== 0 ? 'bg-destructive/10 text-destructive' : 'bg-muted'}`}>
+              {result.sent > 0 || result.failed > 0
+                ? `발송 완료: 성공 ${result.sent}건, 실패 ${result.failed}건`
+                : ''}
+              {result.error && `\n${result.error}`}
             </div>
           )}
 
