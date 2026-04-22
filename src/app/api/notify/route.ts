@@ -40,9 +40,20 @@ export async function POST(request: Request) {
         const contact = person[contactColumn];
         if (!contact) { failed++; continue; }
 
-        const scheduleLines = schedResult.dates
-          .filter((d: string) => schedule.has(d))
-          .map((d: string) => `${d} : ${schedule.get(d)}`)
+        // Merge consecutive dates with same room into ranges
+        const sortedDates = schedResult.dates.filter((d: string) => schedule.has(d));
+        const ranges: { start: string; end: string; room: string }[] = [];
+        for (const d of sortedDates) {
+          const room = schedule.get(d)!;
+          const last = ranges[ranges.length - 1];
+          if (last && last.room === room) {
+            last.end = d;
+          } else {
+            ranges.push({ start: d, end: d, room });
+          }
+        }
+        const scheduleLines = ranges
+          .map((r) => r.start === r.end ? `${r.start} ${r.room}` : `${r.start}~${r.end} ${r.room}`)
           .join('\n');
 
         let message = messageTemplate
