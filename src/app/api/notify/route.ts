@@ -24,24 +24,33 @@ export async function POST(request: Request) {
     let sent = 0;
     let failed = 0;
 
-    if (!('groups' in project.results)) {
-      return NextResponse.json({ error: '기간별 배정 프로젝트는 아직 발송을 지원하지 않습니다.' }, { status: 400 });
-    }
-    for (const group of project.results.groups) {
-      for (const member of group.members) {
-        const contact = member[contactColumn];
-        if (!contact) {
-          failed++;
-          continue;
-        }
+    if ('assignments' in project.results) {
+      // Schedule mode: send per-person schedule
+      const schedResult = project.results as { assignments: { date: string; roomName: string; personId: string }[]; dates: string[] };
+      const personSchedule = new Map<string, Map<string, string>>();
+      for (const a of schedResult.assignments) {
+        if (!personSchedule.has(a.personId)) personSchedule.set(a.personId, new Map());
+        personSchedule.get(a.personId)!.set(a.date, a.roomName);
+      }
 
-        // Build message from template
+      for (const person of project.data) {
+        const schedule = personSchedule.get(person.id);
+        if (!schedule || schedule.size === 0) continue;
+
+        const contact = person[contactColumn];
+        if (!contact) { failed++; continue; }
+
+        const scheduleLines = schedResult.dates
+          .filter((d: string) => schedule.has(d))
+          .map((d: string) => `${d} : ${schedule.get(d)}`)
+          .join('\n');
+
         let message = messageTemplate
-          .replace('{{group}}', group.name)
-          .replace('{{name}}', member['이름'] || member['name'] || member['Name'] || '');
+          .replace('{{name}}', person['이름'] || person['name'] || person['Name'] || person['성명'] || '')
+          .replace('{{schedule}}', scheduleLines)
+          .replace('{{group}}', schedule.values().next().value || '');
 
-        // Replace any {{column}} placeholders
-        for (const [key, val] of Object.entries(member)) {
+        for (const [key, val] of Object.entries(person)) {
           message = message.replace(`{{${key}}}`, val || '');
         }
 
@@ -51,9 +60,31 @@ export async function POST(request: Request) {
         } else if (channel === 'sms') {
           ok = await sendSMS(twilioAccountSid, twilioAuthToken, twilioFromNumber, contact, message);
         }
+        if (ok) sent++; else failed++;
+      }
+    } else {
+      // Group mode
+      for (const group of project.results.groups) {
+        for (const member of group.members) {
+          const contact = member[contactColumn];
+          if (!contact) { failed++; continue; }
 
-        if (ok) sent++;
-        else failed++;
+          let message = messageTemplate
+            .replace('{{group}}', group.name)
+            .replace('{{name}}', member['이름'] || member['name'] || member['Name'] || '');
+
+          for (const [key, val] of Object.entries(member)) {
+            message = message.replace(`{{${key}}}`, val || '');
+          }
+
+          let ok = false;
+          if (channel === 'telegram') {
+            ok = await sendTelegram(telegramBotToken, contact, message);
+          } else if (channel === 'sms') {
+            ok = await sendSMS(twilioAccountSid, twilioAuthToken, twilioFromNumber, contact, message);
+          }
+          if (ok) sent++; else failed++;
+        }
       }
     }
 
