@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         if (!schedule || schedule.size === 0) continue;
 
         const contact = person[contactColumn];
-        if (!contact) { failed++; continue; }
+        if (!contact) continue; // 연락처 없는 사람은 건너뜀
 
         // Merge consecutive dates with same room into ranges
         const sortedDates = schedResult.dates.filter((d: string) => schedule.has(d));
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       for (const group of project.results.groups) {
         for (const member of group.members) {
           const contact = member[contactColumn];
-          if (!contact) { failed++; errors.length < 5 && errors.push(`${member['이름'] || '?'}: 연락처 없음`); continue; }
+          if (!contact) continue; // 연락처 없는 사람은 건너뜀
 
           let message = messageTemplate
             .replace('{{group}}', group.name)
