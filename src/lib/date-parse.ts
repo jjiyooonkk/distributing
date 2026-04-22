@@ -7,16 +7,28 @@ export function parseKoreanDateTime(text: string, baseYear?: number): Date | nul
   const t = text.trim();
   const year = baseYear || new Date().getFullYear();
 
-  // ISO format: 2024-05-08 or 2024-05-08T06:00
-  const iso = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2}))?/);
-  if (iso) {
-    return new Date(+iso[1], +iso[2] - 1, +iso[3], +(iso[4] || 0), +(iso[5] || 0));
+  // Full year format: 2026-05-08, 2026.05.10, 2026/05/10 (with optional time)
+  const fullYear = t.match(/^(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+  if (fullYear) {
+    const fy = +fullYear[1], fm = +fullYear[2], fd = +fullYear[3];
+    // Parse time from remaining text
+    const rest = t.slice(fullYear[0].length);
+    let fh = 0;
+    const ftKr = rest.match(/오후\s*(\d{1,2})\s*시/);
+    const ftAm = rest.match(/오전\s*(\d{1,2})\s*시/);
+    const ftSimple = rest.match(/(\d{1,2})\s*시/);
+    const ftNum = rest.match(/(\d{1,2}):(\d{2})/);
+    if (ftKr) { fh = +ftKr[1]; if (fh < 12) fh += 12; }
+    else if (ftAm) { fh = +ftAm[1]; if (fh === 12) fh = 0; }
+    else if (ftNum) { fh = +ftNum[1]; }
+    else if (ftSimple) { fh = +ftSimple[1]; }
+    return new Date(fy, fm - 1, fd, fh, 0, 0);
   }
 
   let month = 0, day = 0, hour = 0;
 
-  // "5월 8일" or "5/8" pattern
-  const dateMatch = t.match(/(\d{1,2})[\/월\-]\.?\s*(\d{1,2})[일]?/);
+  // "5월 8일" or "5/8" or "5.8" pattern
+  const dateMatch = t.match(/(\d{1,2})[\/월.\-]\s*(\d{1,2})[일]?/);
   if (!dateMatch) return null;
   month = +dateMatch[1];
   day = +dateMatch[2];
