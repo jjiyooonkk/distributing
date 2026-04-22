@@ -303,6 +303,49 @@ export default function ScheduleConfigComponent({
                   />
                 </>
               )}
+              {rule.type === 'exclude' && (
+                <>
+                  <Select
+                    value={(rule as { value: string }).value || ''}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      const updated = [...rules];
+                      updated[i] = { ...updated[i], value: v } as ColumnRule;
+                      setRules(updated);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-24 text-xs">
+                      <SelectValue placeholder="값" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {columns
+                        .find((c) => c.name === rule.columnName)
+                        ?.uniqueValues.map((val) => (
+                          <SelectItem key={val} value={val}>{val}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">제외:</span>
+                  <Select
+                    value={(rule as { excludeGroup: string }).excludeGroup || ''}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      const updated = [...rules];
+                      updated[i] = { ...updated[i], excludeGroup: v } as ColumnRule;
+                      setRules(updated);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-24 text-xs">
+                      <SelectValue placeholder="방" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rooms.map((r) => (
+                        <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
