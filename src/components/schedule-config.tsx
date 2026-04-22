@@ -244,6 +244,12 @@ export default function ScheduleConfigComponent({
             <div className="flex gap-1">
               <Button variant="outline" size="sm" onClick={() => {
                 const col = columns[0]?.name || '';
+                setRules([...rules, { type: 'pin', columnName: col, value: '', targetGroup: rooms[0]?.name || '' }]);
+              }}>
+                + 고정
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => {
+                const col = columns[0]?.name || '';
                 setRules([...rules, { type: 'spread', columnName: col, weight: 5 }]);
               }}>
                 + 분산
@@ -266,7 +272,7 @@ export default function ScheduleConfigComponent({
           {rules.map((rule, i) => (
             <div key={i} className="flex items-center gap-2 p-2 border rounded-lg text-sm">
               <Badge variant="secondary" className="text-xs">
-                {rule.type === 'spread' ? '분산' : '제외'}
+                {rule.type === 'spread' ? '분산' : rule.type === 'pin' ? '고정' : '제외'}
               </Badge>
               <Select
                 value={rule.columnName}
@@ -301,6 +307,49 @@ export default function ScheduleConfigComponent({
                     }}
                     className="w-14 h-7 text-xs"
                   />
+                </>
+              )}
+              {rule.type === 'pin' && (
+                <>
+                  <Select
+                    value={(rule as { value: string }).value || ''}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      const updated = [...rules];
+                      updated[i] = { ...updated[i], value: v } as ColumnRule;
+                      setRules(updated);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-24 text-xs">
+                      <SelectValue placeholder="값" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {columns
+                        .find((c) => c.name === rule.columnName)
+                        ?.uniqueValues.map((val) => (
+                          <SelectItem key={val} value={val}>{val}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">→</span>
+                  <Select
+                    value={(rule as { targetGroup: string }).targetGroup || ''}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      const updated = [...rules];
+                      updated[i] = { ...updated[i], targetGroup: v } as ColumnRule;
+                      setRules(updated);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-24 text-xs">
+                      <SelectValue placeholder="방" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rooms.map((r) => (
+                        <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </>
               )}
               {rule.type === 'exclude' && (
