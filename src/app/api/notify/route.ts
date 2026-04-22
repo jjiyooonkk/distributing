@@ -14,6 +14,7 @@ export async function POST(request: Request) {
       twilioAccountSid,
       twilioAuthToken,
       twilioFromNumber,
+      usernameToChatId = {},
     } = await request.json();
 
     const project = await getProject(code);
@@ -24,6 +25,18 @@ export async function POST(request: Request) {
     let sent = 0;
     let failed = 0;
     const errors: string[] = [];
+
+    // Resolve @username to chat ID
+    function resolveChatId(contact: string): string {
+      const trimmed = contact.trim();
+      // Already a number
+      if (/^\d+$/.test(trimmed)) return trimmed;
+      // @username format
+      const username = trimmed.startsWith('@') ? trimmed.toLowerCase() : `@${trimmed.toLowerCase()}`;
+      const chatId = usernameToChatId[username];
+      if (chatId) return String(chatId);
+      return trimmed; // fallback, will likely fail
+    }
 
     if ('assignments' in project.results) {
       // Schedule mode: send per-person schedule
@@ -66,10 +79,11 @@ export async function POST(request: Request) {
           message = message.replace(`{{${key}}}`, val || '');
         }
 
+        const resolvedContact = channel === 'telegram' ? resolveChatId(contact) : contact;
         const result = channel === 'telegram'
-          ? await sendTelegram(telegramBotToken, contact, message)
+          ? await sendTelegram(telegramBotToken, resolvedContact, message)
           : channel === 'sms'
-          ? { ok: await sendSMS(twilioAccountSid, twilioAuthToken, twilioFromNumber, contact, message) }
+          ? { ok: await sendSMS(twilioAccountSid, twilioAuthToken, twilioFromNumber, resolvedContact, message) }
           : { ok: false, error: '지원하지 않는 채널' };
 
         if (typeof result === 'object' && 'ok' in result && result.ok) {

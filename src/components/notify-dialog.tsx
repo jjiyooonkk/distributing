@@ -45,11 +45,46 @@ export default function NotifyDialog({
   const [twilioFromNumber, setTwilioFromNumber] = useState('');
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ sent: number; failed: number; error?: string } | null>(null);
+  const [tgUsers, setTgUsers] = useState<{ chatId: number; username: string; firstName: string }[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // username→chatId map
+  const usernameMap = new Map<string, number>();
+  for (const u of tgUsers) {
+    if (u.username) usernameMap.set(u.username.toLowerCase(), u.chatId);
+  }
+
+  async function fetchTelegramUsers() {
+    if (!telegramBotToken) return;
+    setLoadingUsers(true);
+    try {
+      const res = await fetch('/api/telegram-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botToken: telegramBotToken }),
+      });
+      const data = await res.json();
+      if (data.users) setTgUsers(data.users);
+      else alert(data.error || '조회 실패');
+    } catch {
+      alert('조회 실패');
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
 
   async function handleSend() {
     setSending(true);
     setResult(null);
     try {
+      // Build username→chatId mapping for Telegram
+      const usernameToChatId: Record<string, number> = {};
+      if (channel === 'telegram') {
+        for (const u of tgUsers) {
+          if (u.username) usernameToChatId[u.username.toLowerCase()] = u.chatId;
+        }
+      }
+
       const res = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -62,6 +97,7 @@ export default function NotifyDialog({
           twilioAccountSid,
           twilioAuthToken,
           twilioFromNumber,
+          usernameToChatId,
         }),
       });
       const data = await res.json();
@@ -123,14 +159,41 @@ export default function NotifyDialog({
           </div>
 
           {channel === 'telegram' && (
-            <div className="space-y-2">
-              <Label>Telegram Bot Token</Label>
-              <Input
-                type="password"
-                value={telegramBotToken}
-                onChange={(e) => setTelegramBotToken(e.target.value)}
-                placeholder="123456:ABC-DEF..."
-              />
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Telegram Bot Token</Label>
+                <Input
+                  type="password"
+                  value={telegramBotToken}
+                  onChange={(e) => setTelegramBotToken(e.target.value)}
+                  placeholder="123456:ABC-DEF..."
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchTelegramUsers}
+                  disabled={loadingUsers || !telegramBotToken}
+                >
+                  {loadingUsers ? '조회 중...' : '봇에 /start한 유저 조회'}
+                </Button>
+                {tgUsers.length > 0 && (
+                  <span className="text-xs text-muted-foreground">{tgUsers.length}명 감지</span>
+                )}
+              </div>
+              {tgUsers.length > 0 && (
+                <div className="text-xs bg-muted p-2 rounded-md max-h-32 overflow-y-auto space-y-0.5">
+                  {tgUsers.map((u) => (
+                    <div key={u.chatId}>
+                      {u.username || u.firstName} → <span className="font-mono">{u.chatId}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                연락처 칼럼에 @username 또는 chat ID(숫자)를 넣으세요. @username은 자동으로 chat ID로 변환됩니다.
+              </p>
             </div>
           )}
 
