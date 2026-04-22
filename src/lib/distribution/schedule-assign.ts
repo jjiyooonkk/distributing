@@ -130,11 +130,19 @@ export function distributeBySchedule(
 
     const stillRemaining = remaining.filter((p) => !ensuredIds.has(p.id));
 
-    // Shuffle for fairness
-    for (let i = stillRemaining.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [stillRemaining[i], stillRemaining[j]] = [stillRemaining[j], stillRemaining[i]];
-    }
+    // Sort: people staying longer get assigned first (they need room stability most)
+    // Also prioritize people who already have a room from last night
+    const personNightCount = new Map<string, number>();
+    for (const s of schedules) personNightCount.set(s.person.id, s.nights.length);
+
+    stillRemaining.sort((a, b) => {
+      const aHasPrev = prevRoom.has(a.id) ? 1 : 0;
+      const bHasPrev = prevRoom.has(b.id) ? 1 : 0;
+      if (aHasPrev !== bHasPrev) return bHasPrev - aHasPrev; // prev room holders first
+      const aNights = personNightCount.get(a.id) || 0;
+      const bNights = personNightCount.get(b.id) || 0;
+      return bNights - aNights; // longer stays first
+    });
 
     // Phase 3: Greedy assignment
     for (const person of stillRemaining) {
@@ -164,14 +172,16 @@ export function distributeBySchedule(
           score -= count * rule.weight;
         }
 
-        // Stability: bonus for staying in same room as last night
+        // Stability: very strong bonus for staying in same room
+        // The longer they've been in this room, the stronger the bonus
         const prev = prevRoom.get(person.id);
         if (prev === roomName) {
-          score += 15; // strong stability bonus
+          const totalNights = personNightCount.get(person.id) || 1;
+          score += 100 + totalNights * 10; // dominant factor — avoid room changes
         }
 
-        // Balance: prefer less full rooms
-        score -= members.length * 0.5;
+        // Balance: prefer less full rooms (weaker than stability)
+        score -= members.length * 0.3;
 
         if (score > bestScore) {
           bestScore = score;
