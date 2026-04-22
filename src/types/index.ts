@@ -95,6 +95,7 @@ export interface DistributionResult {
 export interface RoomDef {
   name: string;
   capacity: number;
+  gender?: string; // "남", "여", 또는 비워두면 혼성
 }
 
 export interface ScheduleConfig {

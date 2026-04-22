@@ -8,6 +8,7 @@ import type {
   SpreadRule,
   ExcludeRule,
   EnsureRule,
+  RoomDef,
 } from '@/types';
 import { parseKoreanDateTime, computeStayNights, formatDate } from '../date-parse';
 
@@ -48,6 +49,24 @@ export function distributeBySchedule(
 
   const roomNames = rooms.map((r) => r.name);
 
+  // Detect gender column
+  const genderCol = columns.find((c) =>
+    c.name.includes('성별') || c.name.toLowerCase() === 'gender'
+  );
+
+  function getPersonGender(person: PersonRow): string {
+    if (!genderCol) return '';
+    const val = (person[genderCol.name] || '').trim();
+    if (['남', '남자', 'M', 'm', 'Male', 'male'].includes(val)) return '남';
+    if (['여', '여자', 'F', 'f', 'Female', 'female'].includes(val)) return '여';
+    return '';
+  }
+
+  function roomAcceptsGender(roomDef: RoomDef, person: PersonRow): boolean {
+    if (!roomDef.gender) return true; // 혼성
+    return getPersonGender(person) === roomDef.gender;
+  }
+
   // Extract rules
   const pinRules = rules.filter((r) => r.type === 'pin' && 'value' in r && (r as PinRule).value) as PinRule[];
   const spreadRules = rules.filter((r) => r.type === 'spread') as SpreadRule[];
@@ -76,9 +95,10 @@ export function distributeBySchedule(
       for (const rule of pinRules) {
         if (person[rule.columnName] === rule.value) {
           const target = roomMembers.get(rule.targetGroup);
-          if (target) {
-            const cap = rooms.find((r) => r.name === rule.targetGroup)?.capacity || Infinity;
-            if (target.length < cap) {
+          const targetRoomDef = rooms.find((r) => r.name === rule.targetGroup);
+          if (target && targetRoomDef) {
+            const cap = targetRoomDef.capacity || Infinity;
+            if (target.length < cap && roomAcceptsGender(targetRoomDef, person)) {
               target.push(person);
               pinned = true;
               break;
@@ -122,8 +142,12 @@ export function distributeBySchedule(
       let bestScore = -Infinity;
 
       for (const [roomName, members] of roomMembers) {
-        const cap = rooms.find((r) => r.name === roomName)?.capacity || Infinity;
+        const roomDef = rooms.find((r) => r.name === roomName);
+        const cap = roomDef?.capacity || Infinity;
         if (members.length >= cap) continue;
+
+        // Gender check
+        if (roomDef && !roomAcceptsGender(roomDef, person)) continue;
 
         // Exclude check
         const excluded = excludeRules.some(

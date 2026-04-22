@@ -198,7 +198,19 @@ export default function ScheduleConfigComponent({
                 className="flex-1 h-8"
                 placeholder="방 이름"
               />
-              <Label className="text-xs shrink-0">정원</Label>
+              <Select
+                value={room.gender || '__mixed__'}
+                onValueChange={(v) => v && updateRoom(i, 'gender', v === '__mixed__' ? '' : v)}
+              >
+                <SelectTrigger className="w-20 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__mixed__">혼성</SelectItem>
+                  <SelectItem value="남">남</SelectItem>
+                  <SelectItem value="여">여</SelectItem>
+                </SelectContent>
+              </Select>
               <Input
                 type="number"
                 min={1}
