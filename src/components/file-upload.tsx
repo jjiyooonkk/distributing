@@ -64,12 +64,30 @@ export default function FileUpload({ onUpload, loading }: FileUploadProps) {
 
       if (ext === 'csv' || ext === 'tsv') {
         Papa.parse(file, {
-          header: true,
+          header: false,
           skipEmptyLines: true,
           complete(results) {
-            const { rows, columns } = parseToRows(
-              results.data as Record<string, string>[]
+            const allRows = results.data as string[][];
+            // 첫 번째 비어있지 않은 행을 헤더로 사용
+            const headerIdx = allRows.findIndex((row) =>
+              row.some((cell) => cell.trim() !== '')
             );
+            if (headerIdx === -1) {
+              onUpload([], []);
+              return;
+            }
+            const headers = allRows[headerIdx];
+            const dataRows = allRows.slice(headerIdx + 1);
+            const rawRows = dataRows
+              .filter((row) => row.some((cell) => cell.trim() !== ''))
+              .map((row) => {
+                const obj: Record<string, string> = {};
+                headers.forEach((h, i) => {
+                  if (h.trim() !== '') obj[h] = row[i] ?? '';
+                });
+                return obj;
+              });
+            const { rows, columns } = parseToRows(rawRows);
             onUpload(rows, columns);
           },
         });
@@ -80,10 +98,30 @@ export default function FileUpload({ onUpload, loading }: FileUploadProps) {
           const data = new Uint8Array(e.target!.result as ArrayBuffer);
           const wb = XLSX.read(data, { type: 'array' });
           const sheet = wb.Sheets[wb.SheetNames[0]];
-          const rawRows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, {
+          // 시트의 전체 데이터를 배열로 읽어서 첫 번째 비어있지 않은 행을 찾음
+          const allRows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+            header: 1,
             defval: '',
             raw: false,
           });
+          const headerIdx = allRows.findIndex((row) =>
+            row.some((cell) => String(cell).trim() !== '')
+          );
+          if (headerIdx === -1) {
+            onUpload([], []);
+            return;
+          }
+          const headers = allRows[headerIdx].map((h) => String(h));
+          const dataRows = allRows.slice(headerIdx + 1);
+          const rawRows = dataRows
+            .filter((row) => row.some((cell) => String(cell).trim() !== ''))
+            .map((row) => {
+              const obj: Record<string, string> = {};
+              headers.forEach((h, i) => {
+                if (h.trim() !== '') obj[h] = String(row[i] ?? '');
+              });
+              return obj;
+            });
           const { rows, columns } = parseToRows(rawRows);
           onUpload(rows, columns);
         };
