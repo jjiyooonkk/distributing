@@ -76,39 +76,35 @@ function parseGroupNames(input: string): string[] {
 }
 
 function expandRange(start: string, end: string): string[] | null {
-  // Find common prefix and suffix, extract the varying part
-  // e.g. "1조" and "10조" → prefix="", suffix="조", from="1", to="10"
-  // e.g. "A팀" and "D팀" → prefix="", suffix="팀", from="A", to="D"
-  let prefixLen = 0;
-  const minLen = Math.min(start.length, end.length);
-  while (prefixLen < minLen && start[prefixLen] === end[prefixLen]) prefixLen++;
-
+  // Step 1: Find common suffix from the end
+  // e.g. "1조" and "10조" → suffix="조", cores="1" and "10"
+  // e.g. "A팀" and "D팀" → suffix="팀", cores="A" and "D"
   let suffixLen = 0;
+  const minLen = Math.min(start.length, end.length);
   while (
-    suffixLen < minLen - prefixLen &&
+    suffixLen < minLen &&
     start[start.length - 1 - suffixLen] === end[end.length - 1 - suffixLen]
   ) suffixLen++;
 
-  const prefix = start.slice(0, prefixLen);
   const suffix = suffixLen > 0 ? start.slice(start.length - suffixLen) : '';
-  const fromPart = start.slice(prefixLen, start.length - suffixLen || undefined);
-  const toPart = end.slice(prefixLen, end.length - suffixLen || undefined);
+  const fromCore = suffixLen > 0 ? start.slice(0, start.length - suffixLen) : start;
+  const toCore = suffixLen > 0 ? end.slice(0, end.length - suffixLen) : end;
 
-  // Numeric range
-  if (/^\d+$/.test(fromPart) && /^\d+$/.test(toPart)) {
-    const from = parseInt(fromPart, 10);
-    const to = parseInt(toPart, 10);
+  // Step 2: Check if cores are purely numeric
+  if (/^\d+$/.test(fromCore) && /^\d+$/.test(toCore)) {
+    const from = parseInt(fromCore, 10);
+    const to = parseInt(toCore, 10);
     if (from > to || to - from > 100) return null;
-    return Array.from({ length: to - from + 1 }, (_, i) => `${prefix}${from + i}${suffix}`);
+    return Array.from({ length: to - from + 1 }, (_, i) => `${from + i}${suffix}`);
   }
 
-  // Single letter range (A~Z or a~z)
-  if (/^[A-Za-z]$/.test(fromPart) && /^[A-Za-z]$/.test(toPart)) {
-    const from = fromPart.charCodeAt(0);
-    const to = toPart.charCodeAt(0);
+  // Step 3: Check if cores are single letters (A~D, a~d)
+  if (/^[A-Za-z]$/.test(fromCore) && /^[A-Za-z]$/.test(toCore)) {
+    const from = fromCore.charCodeAt(0);
+    const to = toCore.charCodeAt(0);
     if (from > to || to - from > 26) return null;
     return Array.from({ length: to - from + 1 }, (_, i) =>
-      `${prefix}${String.fromCharCode(from + i)}${suffix}`
+      `${String.fromCharCode(from + i)}${suffix}`
     );
   }
 
