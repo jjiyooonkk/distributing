@@ -188,12 +188,14 @@ export default function ProjectPage({
               data={project.data}
               onSubmit={handleDistribute}
               loading={distributing}
+              initialConfig={project.config as ScheduleConfig | null}
             />
           ) : (
             <ColumnConfig
               columns={project.columns}
               onSubmit={handleDistribute}
               loading={distributing}
+              initialConfig={project.config as DistributionConfig | null}
             />
           )}
         </div>

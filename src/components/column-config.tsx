@@ -32,6 +32,7 @@ interface ColumnConfigProps {
   columns: ColumnMeta[];
   onSubmit: (config: DistributionConfig) => void;
   loading?: boolean;
+  initialConfig?: DistributionConfig | null;
 }
 
 type Mode = DistributionConfig['mode'];
@@ -52,14 +53,14 @@ const modeLabels: Record<Mode, { title: string; desc: string }> = {
   },
 };
 
-export default function ColumnConfig({ columns, onSubmit, loading }: ColumnConfigProps) {
-  const [mode, setMode] = useState<Mode>('custom');
-  const [groupCount, setGroupCount] = useState(4);
-  const [groupNames, setGroupNames] = useState('');
-  const [useCapacity, setUseCapacity] = useState(false);
-  const [capacities, setCapacities] = useState<GroupCapacity[]>([]);
-  const [rules, setRules] = useState<ColumnRule[]>([]);
-  const [scheduleColumns, setScheduleColumns] = useState<string[]>([]);
+export default function ColumnConfig({ columns, onSubmit, loading, initialConfig }: ColumnConfigProps) {
+  const [mode, setMode] = useState<Mode>(initialConfig?.mode ?? 'custom');
+  const [groupCount, setGroupCount] = useState(initialConfig?.groupCount ?? 4);
+  const [groupNames, setGroupNames] = useState(initialConfig?.groupNames?.join(', ') ?? '');
+  const [useCapacity, setUseCapacity] = useState((initialConfig?.groupCapacities?.length ?? 0) > 0);
+  const [capacities, setCapacities] = useState<GroupCapacity[]>(initialConfig?.groupCapacities ?? []);
+  const [rules, setRules] = useState<ColumnRule[]>(initialConfig?.rules ?? []);
+  const [scheduleColumns, setScheduleColumns] = useState<string[]>(initialConfig?.scheduleColumns ?? []);
 
   // Derived group names list
   const groupNameList =

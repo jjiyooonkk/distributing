@@ -21,6 +21,7 @@ interface ScheduleConfigProps {
   data: PersonRow[];
   onSubmit: (config: ScheduleConfig) => void;
   loading?: boolean;
+  initialConfig?: ScheduleConfig | null;
 }
 
 export default function ScheduleConfigComponent({
@@ -28,14 +29,17 @@ export default function ScheduleConfigComponent({
   data,
   onSubmit,
   loading,
+  initialConfig,
 }: ScheduleConfigProps) {
-  const [arrivalCol, setArrivalCol] = useState('');
-  const [departureCol, setDepartureCol] = useState('');
-  const [rooms, setRooms] = useState<RoomDef[]>([
-    { name: '1호실', capacity: 6 },
-    { name: '2호실', capacity: 6 },
-  ]);
-  const [rules, setRules] = useState<ColumnRule[]>([]);
+  const [arrivalCol, setArrivalCol] = useState(initialConfig?.arrivalColumn ?? '');
+  const [departureCol, setDepartureCol] = useState(initialConfig?.departureColumn ?? '');
+  const [rooms, setRooms] = useState<RoomDef[]>(
+    initialConfig?.rooms ?? [
+      { name: '1호실', capacity: 6 },
+      { name: '2호실', capacity: 6 },
+    ]
+  );
+  const [rules, setRules] = useState<ColumnRule[]>(initialConfig?.rules ?? []);
 
   // Preview parsed dates
   const preview = useMemo(() => {
