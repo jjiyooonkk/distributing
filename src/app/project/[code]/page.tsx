@@ -218,6 +218,7 @@ export default function ProjectPage({
             <DistributionResults
               results={project.results as DistributionResult}
               columns={project.columns}
+              groupLeaders={(project.config as DistributionConfig | null)?.groupLeaders}
               onUpdate={handleResultsUpdate as (r: DistributionResult) => void}
               onNotify={() => setNotifyOpen(true)}
             />

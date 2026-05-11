@@ -79,8 +79,34 @@ export function distributeCustom(
 
   const remaining: PersonRow[] = [];
 
+  // Phase 0: Pin leaders/sub-leaders to their groups by name matching
+  const leaderPinnedIds = new Set<string>();
+  if (config.groupLeaders) {
+    // Find the name column
+    const nameKey = Object.keys(people[0] || {}).find((k) =>
+      ['이름', '성명', 'name', 'Name'].includes(k)
+    );
+    if (nameKey) {
+      for (const gl of config.groupLeaders) {
+        const group = groups.find((g) => g.name === gl.groupName);
+        if (!group) continue;
+        for (const name of [gl.leader, gl.subLeader]) {
+          if (!name?.trim()) continue;
+          const person = people.find(
+            (p) => p[nameKey]?.trim() === name.trim() && !leaderPinnedIds.has(p.id)
+          );
+          if (person) {
+            group.members.push(person);
+            leaderPinnedIds.add(person.id);
+          }
+        }
+      }
+    }
+  }
+
   // Phase 1: Apply pin rules (fixed assignments)
   for (const person of people) {
+    if (leaderPinnedIds.has(person.id)) continue;
     let pinned = false;
     for (const rule of pinRules) {
       if (person[rule.columnName] === rule.value) {
@@ -206,8 +232,8 @@ export function distributeCustom(
   }
 
   // Phase 3: Post-optimization with simulated annealing
-  // Respect pin + ensure rules: these people don't move
-  const pinnedIds = new Set<string>(ensuredIds);
+  // Respect pin + ensure + leader rules: these people don't move
+  const pinnedIds = new Set<string>([...ensuredIds, ...leaderPinnedIds]);
   for (const rule of pinRules) {
     for (const person of people) {
       if (person[rule.columnName] === rule.value) {

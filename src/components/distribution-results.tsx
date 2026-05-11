@@ -18,11 +18,12 @@ import GroupCard from './group-card';
 import PersonChip from './person-chip';
 import ResultsTable from './results-table';
 import { toast } from 'sonner';
-import type { DistributionResult, PersonRow, ColumnMeta } from '@/types';
+import type { DistributionResult, PersonRow, ColumnMeta, GroupLeader } from '@/types';
 
 interface ResultsProps {
   results: DistributionResult;
   columns: ColumnMeta[];
+  groupLeaders?: GroupLeader[];
   onUpdate: (results: DistributionResult) => void;
   onNotify: () => void;
 }
@@ -32,10 +33,11 @@ type ViewMode = 'card' | 'table';
 export default function DistributionResults({
   results,
   columns,
+  groupLeaders,
   onUpdate,
   onNotify,
 }: ResultsProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
     const defaults = new Set<string>();
@@ -231,20 +233,20 @@ export default function DistributionResults({
         </div>
         <div className="flex border rounded-lg overflow-hidden">
           <button
-            onClick={() => setViewMode('table')}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'table' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-            }`}
-          >
-            표
-          </button>
-          <button
             onClick={() => setViewMode('card')}
             className={`px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'card' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
             }`}
           >
             카드
+          </button>
+          <button
+            onClick={() => setViewMode('table')}
+            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+              viewMode === 'table' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+            }`}
+          >
+            표
           </button>
         </div>
       </div>
@@ -255,6 +257,7 @@ export default function DistributionResults({
           results={results}
           columns={columns}
           visibleColumns={visibleColumns}
+          groupLeaders={groupLeaders}
           onMove={movePerson}
         />
       )}
@@ -273,7 +276,7 @@ export default function DistributionResults({
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {results.groups.map((group) => (
-                <GroupCard key={group.id} group={group} columns={filteredColumns} allColumns={columns} />
+                <GroupCard key={group.id} group={group} columns={filteredColumns} allColumns={columns} groupLeaders={groupLeaders} />
               ))}
             </div>
             <DragOverlay>

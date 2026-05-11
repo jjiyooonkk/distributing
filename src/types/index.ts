@@ -69,11 +69,18 @@ export interface RatioRule {
 
 export type ColumnRule = PinRule | SpreadRule | ClusterRule | EnsureRule | ExcludeRule | RatioRule;
 
+export interface GroupLeader {
+  groupName: string;
+  leader?: string;      // 조장 이름
+  subLeader?: string;   // 부조장 이름
+}
+
 export interface DistributionConfig {
   mode: 'random' | 'balanced' | 'schedule' | 'custom';
   groupCount: number;
   groupNames?: string[];
   groupCapacities?: GroupCapacity[];
+  groupLeaders?: GroupLeader[];
   rules: ColumnRule[];
   scheduleColumns?: string[];
 }

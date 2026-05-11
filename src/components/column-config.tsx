@@ -26,6 +26,7 @@ import type {
   ExcludeRule,
   RatioRule,
   GroupCapacity,
+  GroupLeader,
 } from '@/types';
 
 interface ColumnConfigProps {
@@ -53,6 +54,67 @@ const modeLabels: Record<Mode, { title: string; desc: string }> = {
   },
 };
 
+/** Parse group names supporting both comma-separated and range syntax.
+ *  e.g. "1조~10조" → ["1조","2조",...,"10조"]
+ *       "A팀~D팀"  → ["A팀","B팀","C팀","D팀"]
+ *       "1조, 2조, 3조" → ["1조","2조","3조"]
+ *  Ranges work when prefix/suffix match and the varying part is numeric or single letter. */
+function parseGroupNames(input: string): string[] {
+  const trimmed = input.trim();
+  if (!trimmed) return [];
+
+  // Check for range pattern: "X~Y" (with optional spaces around ~)
+  const rangeMatch = trimmed.match(/^(.+?)\s*~\s*(.+)$/);
+  if (rangeMatch) {
+    const [, startStr, endStr] = rangeMatch;
+    const expanded = expandRange(startStr, endStr);
+    if (expanded) return expanded;
+  }
+
+  // Fallback: comma-separated
+  return trimmed.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function expandRange(start: string, end: string): string[] | null {
+  // Find common prefix and suffix, extract the varying part
+  // e.g. "1조" and "10조" → prefix="", suffix="조", from="1", to="10"
+  // e.g. "A팀" and "D팀" → prefix="", suffix="팀", from="A", to="D"
+  let prefixLen = 0;
+  const minLen = Math.min(start.length, end.length);
+  while (prefixLen < minLen && start[prefixLen] === end[prefixLen]) prefixLen++;
+
+  let suffixLen = 0;
+  while (
+    suffixLen < minLen - prefixLen &&
+    start[start.length - 1 - suffixLen] === end[end.length - 1 - suffixLen]
+  ) suffixLen++;
+
+  const prefix = start.slice(0, prefixLen);
+  const suffix = suffixLen > 0 ? start.slice(start.length - suffixLen) : '';
+  const fromPart = start.slice(prefixLen, start.length - suffixLen || undefined);
+  const toPart = end.slice(prefixLen, end.length - suffixLen || undefined);
+
+  // Numeric range
+  if (/^\d+$/.test(fromPart) && /^\d+$/.test(toPart)) {
+    const from = parseInt(fromPart, 10);
+    const to = parseInt(toPart, 10);
+    if (from > to || to - from > 100) return null;
+    return Array.from({ length: to - from + 1 }, (_, i) => `${prefix}${from + i}${suffix}`);
+  }
+
+  // Single letter range (A~Z or a~z)
+  if (/^[A-Za-z]$/.test(fromPart) && /^[A-Za-z]$/.test(toPart)) {
+    const from = fromPart.charCodeAt(0);
+    const to = toPart.charCodeAt(0);
+    if (from > to || to - from > 26) return null;
+    return Array.from({ length: to - from + 1 }, (_, i) =>
+      `${prefix}${String.fromCharCode(from + i)}${suffix}`
+    );
+  }
+
+  return null;
+}
+
 export default function ColumnConfig({ columns, onSubmit, loading, initialConfig }: ColumnConfigProps) {
   const [mode, setMode] = useState<Mode>(initialConfig?.mode ?? 'custom');
   const [groupCount, setGroupCount] = useState(initialConfig?.groupCount ?? 4);
@@ -60,15 +122,15 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
   const [useCapacity, setUseCapacity] = useState((initialConfig?.groupCapacities?.length ?? 0) > 0);
   const [capacities, setCapacities] = useState<GroupCapacity[]>(initialConfig?.groupCapacities ?? []);
   const [rules, setRules] = useState<ColumnRule[]>(initialConfig?.rules ?? []);
+  const [useLeaders, setUseLeaders] = useState((initialConfig?.groupLeaders?.length ?? 0) > 0);
+  const [leaders, setLeaders] = useState<GroupLeader[]>(initialConfig?.groupLeaders ?? []);
   const [scheduleColumns, setScheduleColumns] = useState<string[]>(initialConfig?.scheduleColumns ?? []);
 
-  // Derived group names list
+  // Derived group names list (supports range syntax like "1조~10조")
+  const parsedNames = parseGroupNames(groupNames);
   const groupNameList =
-    groupNames
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean).length > 0
-      ? groupNames.split(',').map((s) => s.trim()).filter(Boolean)
+    parsedNames.length > 0
+      ? parsedNames
       : Array.from({ length: groupCount }, (_, i) => `${i + 1}조`);
 
   // --- Capacity ---
@@ -86,6 +148,17 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
   function updateCapacity(idx: number, field: 'min' | 'max', value: number) {
     setCapacities((prev) =>
       prev.map((c, i) => (i === idx ? { ...c, [field]: value } : c))
+    );
+  }
+
+  // --- Leaders ---
+  function initLeaders() {
+    setLeaders(groupNameList.map((name) => ({ groupName: name, leader: '', subLeader: '' })));
+  }
+
+  function updateLeader(idx: number, field: 'leader' | 'subLeader', value: string) {
+    setLeaders((prev) =>
+      prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l))
     );
   }
 
@@ -149,11 +222,16 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
   }
 
   function handleSubmit() {
+    const finalGroupCount = groupNameList.length > 0 ? groupNameList.length : groupCount;
+    const activeLeaders = useLeaders
+      ? leaders.filter((l) => l.leader?.trim() || l.subLeader?.trim())
+      : undefined;
     onSubmit({
       mode,
-      groupCount,
+      groupCount: finalGroupCount,
       groupNames: groupNameList.length > 0 ? groupNameList : undefined,
       groupCapacities: useCapacity ? capacities : undefined,
+      groupLeaders: activeLeaders?.length ? activeLeaders : undefined,
       rules,
       scheduleColumns: mode === 'schedule' ? scheduleColumns : undefined,
     });
@@ -215,9 +293,9 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
               />
             </div>
             <div className="space-y-2">
-              <Label>그룹 이름 (쉼표 구분)</Label>
+              <Label>그룹 이름 (쉼표 또는 범위)</Label>
               <Input
-                placeholder="예: 1조, 2조, 3조, 4조"
+                placeholder="예: 1조~10조 또는 1조, 2조, 3조"
                 value={groupNames}
                 onChange={(e) => setGroupNames(e.target.value)}
               />
@@ -261,6 +339,47 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
                     value={capacities[i]?.max ?? 20}
                     onChange={(e) => updateCapacity(i, 'max', Number(e.target.value))}
                     className="w-16 h-8"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Leaders */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>조장 / 부조장 지정</Label>
+              <p className="text-xs text-muted-foreground">각 조의 조장·부조장을 고정합니다 (이름 입력)</p>
+            </div>
+            <Switch
+              checked={useLeaders}
+              onCheckedChange={(v) => {
+                setUseLeaders(v);
+                if (v && leaders.length === 0) initLeaders();
+              }}
+            />
+          </div>
+
+          {useLeaders && (
+            <div className="space-y-2">
+              {groupNameList.map((name, i) => (
+                <div key={name} className="flex items-center gap-3 text-sm">
+                  <span className="w-16 font-medium truncate">{name}</span>
+                  <Label className="text-xs text-muted-foreground shrink-0">조장</Label>
+                  <Input
+                    placeholder="이름"
+                    value={leaders[i]?.leader ?? ''}
+                    onChange={(e) => updateLeader(i, 'leader', e.target.value)}
+                    className="w-24 h-8"
+                  />
+                  <Label className="text-xs text-muted-foreground shrink-0">부조장</Label>
+                  <Input
+                    placeholder="이름"
+                    value={leaders[i]?.subLeader ?? ''}
+                    onChange={(e) => updateLeader(i, 'subLeader', e.target.value)}
+                    className="w-24 h-8"
                   />
                 </div>
               ))}

@@ -17,12 +17,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import type { DistributionResult, ColumnMeta, PersonRow } from '@/types';
+import type { DistributionResult, ColumnMeta, PersonRow, GroupLeader } from '@/types';
 
 interface ResultsTableProps {
   results: DistributionResult;
   columns: ColumnMeta[];
   visibleColumns: Set<string>;
+  groupLeaders?: GroupLeader[];
   onMove: (personId: string, fromGroupId: string, toGroupId: string) => void;
 }
 
@@ -30,6 +31,7 @@ export default function ResultsTable({
   results,
   columns,
   visibleColumns,
+  groupLeaders,
   onMove,
 }: ResultsTableProps) {
   const hakbunCol = columns.find((c) =>
@@ -143,6 +145,19 @@ export default function ResultsTable({
     return '';
   }
 
+  function getLeaderRole(person: PersonRow, groupName: string): string | null {
+    if (!groupLeaders || !nameCol) return null;
+    const name = person[nameCol.name]?.trim();
+    if (!name) return null;
+    const gl = groupLeaders.find((l) => l.groupName === groupName);
+    if (!gl) return null;
+    if (gl.leader?.trim() === name) return '조장';
+    if (gl.subLeader?.trim() === name) return '부조장';
+    return null;
+  }
+
+  const hasLeaders = groupLeaders && groupLeaders.some((l) => l.leader?.trim() || l.subLeader?.trim());
+
   const sortOptions = [
     { value: '__group__', label: '배정 그룹' },
     ...shownCols.map((c) => ({ value: c.name, label: c.name })),
@@ -191,6 +206,7 @@ export default function ResultsTable({
               >
                 배정 그룹{sortIndicator('__group__')}
               </TableHead>
+              {hasLeaders && <TableHead className="w-16">역할</TableHead>}
               {shownCols.map((col) => (
                 <TableHead
                   key={col.name}
@@ -203,7 +219,9 @@ export default function ResultsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((row, i) => (
+            {sorted.map((row, i) => {
+              const role = getLeaderRole(row.person, row.groupName);
+              return (
               <TableRow key={row.person.id} className={getGenderColor(row.person)}>
                 <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
                 <TableCell className="p-1">
@@ -225,13 +243,23 @@ export default function ResultsTable({
                     </SelectContent>
                   </Select>
                 </TableCell>
+                {hasLeaders && (
+                  <TableCell className="text-xs font-medium">
+                    {role && (
+                      <span className={role === '조장' ? 'text-amber-600' : 'text-blue-600'}>
+                        {role === '조장' ? '★ ' : '☆ '}{role}
+                      </span>
+                    )}
+                  </TableCell>
+                )}
                 {shownCols.map((col) => (
                   <TableCell key={col.name} className="text-sm">
                     {row.person[col.name] || ''}
                   </TableCell>
                 ))}
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>

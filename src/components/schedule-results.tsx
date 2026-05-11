@@ -42,7 +42,7 @@ export default function ScheduleResults({
   onUpdate,
   onNotify,
 }: ScheduleResultsProps) {
-  const [view, setView] = useState<ViewMode>('date');
+  const [view, setView] = useState<ViewMode>('room');
   const [filter, setFilter] = useState('');
   const [selectedDate, setSelectedDate] = useState(results.dates[0] || '');
 
@@ -184,7 +184,7 @@ export default function ScheduleResults({
       {/* View toggle + filter */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex border rounded-lg overflow-hidden">
-          {([['date', '날짜별'], ['person', '개인별'], ['room', '방별']] as [ViewMode, string][]).map(
+          {([['room', '방별'], ['person', '개인별'], ['date', '날짜별']] as [ViewMode, string][]).map(
             ([key, label]) => (
               <button
                 key={key}

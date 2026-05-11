@@ -7,6 +7,7 @@ interface PersonChipProps {
   person: PersonRow;
   columns: ColumnMeta[];
   overlay?: boolean;
+  role?: string | null; // "조장" | "부조장"
 }
 
 function getGenderStyle(person: PersonRow, columns: ColumnMeta[]): string {
@@ -22,7 +23,7 @@ function getGenderStyle(person: PersonRow, columns: ColumnMeta[]): string {
   return 'bg-card';
 }
 
-export default function PersonChip({ person, columns, overlay }: PersonChipProps) {
+export default function PersonChip({ person, columns, overlay, role }: PersonChipProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: person.id,
   });
@@ -42,6 +43,11 @@ export default function PersonChip({ person, columns, overlay }: PersonChipProps
         isDragging ? 'opacity-30' : 'opacity-100'
       } ${overlay ? 'bg-primary text-primary-foreground shadow-lg' : `hover:bg-accent ${genderStyle}`}`}
     >
+      {role && (
+        <span className={`mr-1 text-xs font-semibold ${role === '조장' ? 'text-amber-600' : 'text-blue-600'}`}>
+          {role === '조장' ? '★' : '☆'}
+        </span>
+      )}
       {display || person.id.slice(0, 4)}
     </div>
   );
