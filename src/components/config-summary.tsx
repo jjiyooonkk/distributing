@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type {
   DistributionConfig,
+  ScheduleConfig,
   PinRule,
   SpreadRule,
   ClusterRule,
@@ -13,7 +14,7 @@ import type {
 } from '@/types';
 
 interface ConfigSummaryProps {
-  config: DistributionConfig;
+  config: DistributionConfig | ScheduleConfig;
 }
 
 const modeLabels: Record<string, string> = {
@@ -71,8 +72,57 @@ function describeRule(rule: DistributionConfig['rules'][number]): string {
   }
 }
 
+function isScheduleConfig(c: DistributionConfig | ScheduleConfig): c is ScheduleConfig {
+  return 'arrivalColumn' in c;
+}
+
 export default function ConfigSummary({ config }: ConfigSummaryProps) {
   if (!config) return null;
+
+  if (isScheduleConfig(config)) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            적용된 배정 설정
+            <Badge variant="secondary" className="text-xs font-normal">
+              기간별 배정
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="text-xs text-muted-foreground space-y-0.5">
+            <div>도착: {config.arrivalColumn} / 출발: {config.departureColumn}</div>
+            <div>
+              숙소: {config.rooms.map((r) => (
+                <span key={r.name} className="mr-2">
+                  {r.name} ({r.capacity}명{r.gender ? `, ${r.gender}` : ''})
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {config.rules.length > 0 ? (
+            <div className="space-y-1">
+              {config.rules.map((rule, i) => {
+                const style = ruleStyles[rule.type];
+                return (
+                  <div key={i} className="flex items-start gap-1.5 text-xs">
+                    <Badge className={`${style.color} text-[10px] px-1.5 py-0 shrink-0`}>
+                      {style.label}
+                    </Badge>
+                    <span>{describeRule(rule)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">설정된 규칙 없음</p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   const hasCapacities = config.groupCapacities && config.groupCapacities.length > 0;
 

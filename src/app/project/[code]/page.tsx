@@ -13,7 +13,7 @@ import ScheduleConfigComponent from '@/components/schedule-config';
 import ScheduleResults from '@/components/schedule-results';
 import NotifyDialog from '@/components/notify-dialog';
 import ConfigSummary from '@/components/config-summary';
-import type { Project, PersonRow, ColumnMeta, DistributionConfig, DistributionResult, ScheduleConfig, ScheduleResult, isScheduleResult, isScheduleConfig } from '@/types';
+import type { Project, PersonRow, ColumnMeta, DistributionConfig, DistributionResult, ScheduleConfig, ScheduleResult } from '@/types';
 import { toast } from 'sonner';
 
 type Step = 'upload' | 'configure' | 'results';
@@ -201,8 +201,8 @@ export default function ProjectPage({
 
       {step === 'results' && project.results && (
         <>
-          {project.config && !('arrivalColumn' in project.config) && (
-            <ConfigSummary config={project.config as DistributionConfig} />
+          {project.config && (
+            <ConfigSummary config={project.config} />
           )}
           {'assignments' in project.results ? (
             <ScheduleResults
