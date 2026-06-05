@@ -27,6 +27,7 @@ import type {
   RatioRule,
   GroupCapacity,
   GroupLeader,
+  GroupQuota,
 } from '@/types';
 
 interface ColumnConfigProps {
@@ -120,6 +121,8 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
   const [rules, setRules] = useState<ColumnRule[]>(initialConfig?.rules ?? []);
   const [useLeaders, setUseLeaders] = useState((initialConfig?.groupLeaders?.length ?? 0) > 0);
   const [leaders, setLeaders] = useState<GroupLeader[]>(initialConfig?.groupLeaders ?? []);
+  const [useQuotas, setUseQuotas] = useState((initialConfig?.groupQuotas?.length ?? 0) > 0);
+  const [quotas, setQuotas] = useState<GroupQuota[]>(initialConfig?.groupQuotas ?? []);
   const [scheduleColumns, setScheduleColumns] = useState<string[]>(initialConfig?.scheduleColumns ?? []);
 
   // Derived group names list (supports range syntax like "1조~10조")
@@ -267,6 +270,7 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
       groupNames: groupNameList.length > 0 ? groupNameList : undefined,
       groupCapacities: useCapacity ? capacities : undefined,
       groupLeaders: activeLeaders?.length ? activeLeaders : undefined,
+      groupQuotas: useQuotas && quotas.length > 0 ? quotas : undefined,
       rules,
       scheduleColumns: mode === 'schedule' ? scheduleColumns : undefined,
     });
@@ -451,6 +455,140 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
                 </div>
               ))}
             </div>
+          )}
+
+          <Separator />
+
+          {/* Group Quotas - 그룹별 인원 구성 */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>그룹별 인원 구성</Label>
+              <p className="text-xs text-muted-foreground">각 조의 성별/학번 등 값별 인원수를 지정합니다</p>
+            </div>
+            <Switch
+              checked={useQuotas}
+              onCheckedChange={(v) => {
+                setUseQuotas(v);
+                if (v && quotas.length === 0) {
+                  // Find first category column (likely 성별)
+                  const catCol = columns.find((c) => c.type === 'category') || columns[0];
+                  if (catCol) {
+                    const counts: Record<string, Record<string, number>> = {};
+                    for (const gn of groupNameList) {
+                      counts[gn] = {};
+                      for (const val of catCol.uniqueValues) {
+                        counts[gn][val] = 0;
+                      }
+                    }
+                    setQuotas([{ columnName: catCol.name, counts }]);
+                  }
+                }
+              }}
+            />
+          </div>
+
+          {useQuotas && quotas.map((quota, qi) => {
+            const col = columns.find((c) => c.name === quota.columnName);
+            const values = col?.uniqueValues || [];
+            return (
+              <div key={qi} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs shrink-0">칼럼</Label>
+                  <Select
+                    value={quota.columnName}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      const newCol = columns.find((c) => c.name === v);
+                      const counts: Record<string, Record<string, number>> = {};
+                      for (const gn of groupNameList) {
+                        counts[gn] = {};
+                        for (const val of newCol?.uniqueValues || []) {
+                          counts[gn][val] = 0;
+                        }
+                      }
+                      setQuotas((prev) => prev.map((q, i) => i === qi ? { columnName: v, counts } : q));
+                    }}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {columns.filter((c) => c.type === 'category').map((c) => (
+                        <SelectItem key={c.name} value={c.name}>{c.name} ({c.uniqueValues.length}종)</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {quotas.length > 1 && (
+                    <Button variant="ghost" size="sm" onClick={() => setQuotas((prev) => prev.filter((_, i) => i !== qi))} className="h-6 px-2 text-muted-foreground">X</Button>
+                  )}
+                </div>
+
+                {/* Header row */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="w-16 shrink-0" />
+                  {values.map((val) => (
+                    <span key={val} className="w-14 text-center">{val}</span>
+                  ))}
+                  <span className="w-14 text-center">합계</span>
+                </div>
+
+                {/* Per-group rows */}
+                {groupNameList.map((gn) => {
+                  const groupCounts = quota.counts[gn] || {};
+                  const total = values.reduce((s, v) => s + (groupCounts[v] || 0), 0);
+                  return (
+                    <div key={gn} className="flex items-center gap-2 text-sm">
+                      <span className="w-16 font-medium truncate shrink-0">{gn}</span>
+                      {values.map((val) => (
+                        <Input
+                          key={val}
+                          type="number"
+                          min={0}
+                          value={groupCounts[val] || 0}
+                          onChange={(e) => {
+                            const num = Number(e.target.value) || 0;
+                            setQuotas((prev) => prev.map((q, i) => {
+                              if (i !== qi) return q;
+                              return {
+                                ...q,
+                                counts: {
+                                  ...q.counts,
+                                  [gn]: { ...q.counts[gn], [val]: num },
+                                },
+                              };
+                            }));
+                          }}
+                          className="w-14 h-7 text-center text-sm"
+                        />
+                      ))}
+                      <span className="w-14 text-center text-xs text-muted-foreground">{total}명</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+
+          {useQuotas && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const catCol = columns.find((c) => c.type === 'category' && !quotas.some((q) => q.columnName === c.name)) || columns.find((c) => c.type === 'category');
+                if (!catCol) return;
+                const counts: Record<string, Record<string, number>> = {};
+                for (const gn of groupNameList) {
+                  counts[gn] = {};
+                  for (const val of catCol.uniqueValues) {
+                    counts[gn][val] = 0;
+                  }
+                }
+                setQuotas((prev) => [...prev, { columnName: catCol.name, counts }]);
+              }}
+              className="text-xs"
+            >
+              + 다른 칼럼도 인원 지정
+            </Button>
           )}
         </CardContent>
       </Card>

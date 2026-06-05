@@ -77,12 +77,19 @@ export interface GroupLeader {
   fixedMembers?: string[]; // 추가 고정인원 이름
 }
 
+// 그룹별 칼럼 값 인원 지정 (예: 1조 여6 남4)
+export interface GroupQuota {
+  columnName: string;
+  counts: Record<string, Record<string, number>>; // { "1조": { "여": 6, "남": 4 }, "2조": ... }
+}
+
 export interface DistributionConfig {
   mode: 'random' | 'balanced' | 'schedule' | 'custom';
   groupCount: number;
   groupNames?: string[];
   groupCapacities?: GroupCapacity[];
   groupLeaders?: GroupLeader[];
+  groupQuotas?: GroupQuota[];
   rules: ColumnRule[];
   scheduleColumns?: string[];
 }

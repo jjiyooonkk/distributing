@@ -9,6 +9,7 @@ import type {
   ExcludeRule,
   RatioRule,
   GroupCapacity,
+  GroupQuota,
 } from '@/types';
 import { nanoid } from 'nanoid';
 
@@ -76,6 +77,7 @@ export function distributeCustom(
   const ensureRules = config.rules.filter((r): r is EnsureRule => r.type === 'ensure' && !!r.value);
   const excludeRules = config.rules.filter((r): r is ExcludeRule => r.type === 'exclude' && !!r.value);
   const ratioRules = config.rules.filter((r): r is RatioRule => r.type === 'ratio');
+  const quotaRules: GroupQuota[] = config.groupQuotas || [];
 
   const remaining: PersonRow[] = [];
 
@@ -183,7 +185,30 @@ export function distributeCustom(
       );
       if (excluded) continue;
 
+      // Skip if quota for this value in this group is already met
+      let quotaFull = false;
+      for (const quota of quotaRules) {
+        const val = person[quota.columnName] || '';
+        const limit = quota.counts[group.name]?.[val];
+        if (limit !== undefined && limit > 0) {
+          const current = group.members.filter((m) => m[quota.columnName] === val).length;
+          if (current >= limit) { quotaFull = true; break; }
+        }
+      }
+      if (quotaFull) continue;
+
       let score = 0;
+
+      // Quota: strongly reward groups that still need this value
+      for (const quota of quotaRules) {
+        const val = person[quota.columnName] || '';
+        const limit = quota.counts[group.name]?.[val];
+        if (limit !== undefined && limit > 0) {
+          const current = group.members.filter((m) => m[quota.columnName] === val).length;
+          const remaining_slots = limit - current;
+          score += remaining_slots * 50; // high weight to prioritize quota fulfillment
+        }
+      }
 
       // Spread: penalize groups that already have same value
       for (const rule of spreadRules) {
@@ -300,7 +325,20 @@ export function distributeCustom(
       }
     );
 
-    if (withinCap && !excludeViolation && (delta < 0 || Math.random() < Math.exp(-delta / temperature))) {
+    // Check quota constraints after swap
+    const quotaViolation = quotaRules.some((quota) => {
+      for (const grp of [g1, g2]) {
+        for (const [val, limit] of Object.entries(quota.counts[grp.name] || {})) {
+          if (limit > 0) {
+            const count = grp.members.filter((m) => m[quota.columnName] === val).length;
+            if (count > limit) return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    if (withinCap && !excludeViolation && !quotaViolation && (delta < 0 || Math.random() < Math.exp(-delta / temperature))) {
       // Accept
     } else {
       // Revert

@@ -171,6 +171,20 @@ export default function ConfigSummary({ config }: ConfigSummaryProps) {
           <p className="text-xs text-muted-foreground">설정된 규칙 없음</p>
         )}
 
+        {config.groupQuotas && config.groupQuotas.length > 0 && (
+          <div className="text-xs text-muted-foreground space-y-0.5">
+            {config.groupQuotas.map((q, qi) => (
+              <div key={qi}>
+                {q.columnName} 인원 구성:{' '}
+                {Object.entries(q.counts).map(([gn, vals]) => {
+                  const parts = Object.entries(vals).filter(([, c]) => c > 0).map(([v, c]) => `${v}${c}`).join(' ');
+                  return parts ? <span key={gn} className="mr-2">{gn}({parts})</span> : null;
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+
         {config.scheduleColumns && config.scheduleColumns.length > 0 && (
           <div className="text-xs text-muted-foreground">
             스케줄 칼럼: {config.scheduleColumns.join(', ')}
