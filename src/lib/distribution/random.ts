@@ -12,7 +12,7 @@ export function distributeRandom(
     stats: {},
   }));
 
-  // Pin leaders first
+  // Pin leaders + fixed members first
   const leaderPinnedIds = new Set<string>();
   if (config.groupLeaders) {
     const nameKey = Object.keys(people[0] || {}).find((k) =>
@@ -22,7 +22,8 @@ export function distributeRandom(
       for (const gl of config.groupLeaders) {
         const group = groups.find((g) => g.name === gl.groupName);
         if (!group) continue;
-        for (const name of [gl.leader, gl.subLeader]) {
+        const names = [gl.leader, gl.subLeader, ...(gl.fixedMembers || [])];
+        for (const name of names) {
           if (!name?.trim()) continue;
           const person = people.find(
             (p) => p[nameKey]?.trim() === name.trim() && !leaderPinnedIds.has(p.id)

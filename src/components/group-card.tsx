@@ -46,6 +46,7 @@ export default function GroupCard({ group, columns, allColumns, groupLeaders }: 
     if (!name) return null;
     if (leaderInfo.leader?.trim() === name) return '조장';
     if (leaderInfo.subLeader?.trim() === name) return '부조장';
+    if (leaderInfo.fixedMembers?.some((m) => m.trim() === name)) return '고정';
     return null;
   }
 
@@ -56,11 +57,11 @@ export default function GroupCard({ group, columns, allColumns, groupLeaders }: 
     );
 
     return [...group.members].sort((a, b) => {
-      // Leaders always first: 조장 > 부조장 > others
+      // Leaders always first: 조장 > 부조장 > 고정 > others
       const roleA = getLeaderRole(a);
       const roleB = getLeaderRole(b);
-      const orderA = roleA === '조장' ? 0 : roleA === '부조장' ? 1 : 2;
-      const orderB = roleB === '조장' ? 0 : roleB === '부조장' ? 1 : 2;
+      const orderA = roleA === '조장' ? 0 : roleA === '부조장' ? 1 : roleA === '고정' ? 2 : 3;
+      const orderB = roleB === '조장' ? 0 : roleB === '부조장' ? 1 : roleB === '고정' ? 2 : 3;
       if (orderA !== orderB) return orderA - orderB;
 
       if (numCol) {

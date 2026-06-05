@@ -56,7 +56,8 @@ function describeRule(rule: DistributionConfig['rules'][number]): string {
     }
     case 'exclude': {
       const r = rule as ExcludeRule;
-      return `${r.columnName}: "${r.value}" → ${r.excludeGroup} 제외`;
+      const groups = r.excludeGroups?.length ? r.excludeGroups.join(', ') : r.excludeGroup;
+      return `${r.columnName}: "${r.value}" → ${groups} 제외`;
     }
     case 'ratio': {
       const r = rule as RatioRule;

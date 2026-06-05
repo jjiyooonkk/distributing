@@ -79,7 +79,7 @@ export function distributeCustom(
 
   const remaining: PersonRow[] = [];
 
-  // Phase 0: Pin leaders/sub-leaders to their groups by name matching
+  // Phase 0: Pin leaders/sub-leaders/fixed members to their groups by name matching
   const leaderPinnedIds = new Set<string>();
   if (config.groupLeaders) {
     // Find the name column
@@ -90,7 +90,8 @@ export function distributeCustom(
       for (const gl of config.groupLeaders) {
         const group = groups.find((g) => g.name === gl.groupName);
         if (!group) continue;
-        for (const name of [gl.leader, gl.subLeader]) {
+        const names = [gl.leader, gl.subLeader, ...(gl.fixedMembers || [])];
+        for (const name of names) {
           if (!name?.trim()) continue;
           const person = people.find(
             (p) => p[nameKey]?.trim() === name.trim() && !leaderPinnedIds.has(p.id)
@@ -177,7 +178,8 @@ export function distributeCustom(
 
       // Skip if excluded
       const excluded = excludeRules.some(
-        (rule) => person[rule.columnName] === rule.value && group.name === rule.excludeGroup
+        (rule) => person[rule.columnName] === rule.value &&
+          (rule.excludeGroups?.includes(group.name) ?? group.name === rule.excludeGroup)
       );
       if (excluded) continue;
 
@@ -288,9 +290,14 @@ export function distributeCustom(
 
     // Check exclude rules aren't violated by swap
     const excludeViolation = excludeRules.some(
-      (rule) =>
-        (p2[rule.columnName] === rule.value && g1.name === rule.excludeGroup) ||
-        (p1[rule.columnName] === rule.value && g2.name === rule.excludeGroup)
+      (rule) => {
+        const isExcluded = (groupName: string) =>
+          rule.excludeGroups?.includes(groupName) ?? groupName === rule.excludeGroup;
+        return (
+          (p2[rule.columnName] === rule.value && isExcluded(g1.name)) ||
+          (p1[rule.columnName] === rule.value && isExcluded(g2.name))
+        );
+      }
     );
 
     if (withinCap && !excludeViolation && (delta < 0 || Math.random() < Math.exp(-delta / temperature))) {

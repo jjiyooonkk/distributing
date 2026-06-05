@@ -153,10 +153,11 @@ export default function ResultsTable({
     if (!gl) return null;
     if (gl.leader?.trim() === name) return '조장';
     if (gl.subLeader?.trim() === name) return '부조장';
+    if (gl.fixedMembers?.some((m) => m.trim() === name)) return '고정';
     return null;
   }
 
-  const hasLeaders = groupLeaders && groupLeaders.some((l) => l.leader?.trim() || l.subLeader?.trim());
+  const hasLeaders = groupLeaders && groupLeaders.some((l) => l.leader?.trim() || l.subLeader?.trim() || l.fixedMembers?.some((m) => m.trim()));
 
   const sortOptions = [
     { value: '__group__', label: '배정 그룹' },
@@ -246,8 +247,8 @@ export default function ResultsTable({
                 {hasLeaders && (
                   <TableCell className="text-xs font-medium">
                     {role && (
-                      <span className={role === '조장' ? 'text-amber-600' : 'text-blue-600'}>
-                        {role === '조장' ? '★ ' : '☆ '}{role}
+                      <span className={role === '조장' ? 'text-amber-600' : role === '부조장' ? 'text-blue-600' : 'text-emerald-600'}>
+                        {role === '조장' ? '★ ' : role === '부조장' ? '☆ ' : '◆ '}{role}
                       </span>
                     )}
                   </TableCell>

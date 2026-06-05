@@ -54,7 +54,8 @@ export interface ExcludeRule {
   type: 'exclude';
   columnName: string;
   value: string;         // 칼럼 값 (예: "서울")
-  excludeGroup: string;  // 이 그룹에 배정하지 않음
+  excludeGroup: string;  // 단일 그룹 (하위호환)
+  excludeGroups?: string[]; // 여러 그룹에서 제외 (예: ["1조","2조","3조"])
 }
 
 // "남녀 비율 2:1" 또는 "학번별 균등 비율" 같은 비율 배정
@@ -73,6 +74,7 @@ export interface GroupLeader {
   groupName: string;
   leader?: string;      // 조장 이름
   subLeader?: string;   // 부조장 이름
+  fixedMembers?: string[]; // 추가 고정인원 이름
 }
 
 export interface DistributionConfig {

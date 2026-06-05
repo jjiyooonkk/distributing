@@ -159,7 +159,8 @@ export function distributeBySchedule(
 
         // Exclude check
         const excluded = excludeRules.some(
-          (rule) => person[rule.columnName] === rule.value && roomName === rule.excludeGroup
+          (rule) => person[rule.columnName] === rule.value &&
+            (rule.excludeGroups?.includes(roomName) ?? roomName === rule.excludeGroup)
         );
         if (excluded) continue;
 

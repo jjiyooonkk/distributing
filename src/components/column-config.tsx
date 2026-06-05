@@ -149,12 +149,46 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
 
   // --- Leaders ---
   function initLeaders() {
-    setLeaders(groupNameList.map((name) => ({ groupName: name, leader: '', subLeader: '' })));
+    setLeaders(groupNameList.map((name) => ({ groupName: name, leader: '', subLeader: '', fixedMembers: [] })));
   }
 
   function updateLeader(idx: number, field: 'leader' | 'subLeader', value: string) {
     setLeaders((prev) =>
       prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l))
+    );
+  }
+
+  function updateFixedMember(groupIdx: number, memberIdx: number, value: string) {
+    setLeaders((prev) =>
+      prev.map((l, i) => {
+        if (i !== groupIdx) return l;
+        const fixed = [...(l.fixedMembers || [])];
+        fixed[memberIdx] = value;
+        return { ...l, fixedMembers: fixed };
+      })
+    );
+  }
+
+  function addFixedMember(groupIdx: number) {
+    setLeaders((prev) =>
+      prev.map((l, i) => {
+        if (i !== groupIdx) return l;
+        const fixed = [...(l.fixedMembers || [])];
+        // no limit on fixed members
+        fixed.push('');
+        return { ...l, fixedMembers: fixed };
+      })
+    );
+  }
+
+  function removeFixedMember(groupIdx: number, memberIdx: number) {
+    setLeaders((prev) =>
+      prev.map((l, i) => {
+        if (i !== groupIdx) return l;
+        const fixed = [...(l.fixedMembers || [])];
+        fixed.splice(memberIdx, 1);
+        return { ...l, fixedMembers: fixed };
+      })
     );
   }
 
@@ -220,7 +254,12 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
   function handleSubmit() {
     const finalGroupCount = groupNameList.length > 0 ? groupNameList.length : groupCount;
     const activeLeaders = useLeaders
-      ? leaders.filter((l) => l.leader?.trim() || l.subLeader?.trim())
+      ? leaders
+          .map((l) => ({
+            ...l,
+            fixedMembers: l.fixedMembers?.filter((m) => m.trim()) || [],
+          }))
+          .filter((l) => l.leader?.trim() || l.subLeader?.trim() || (l.fixedMembers && l.fixedMembers.length > 0))
       : undefined;
     onSubmit({
       mode,
@@ -359,24 +398,56 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
           </div>
 
           {useLeaders && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {groupNameList.map((name, i) => (
-                <div key={name} className="flex items-center gap-3 text-sm">
-                  <span className="w-16 font-medium truncate">{name}</span>
-                  <Label className="text-xs text-muted-foreground shrink-0">조장</Label>
-                  <Input
-                    placeholder="이름"
-                    value={leaders[i]?.leader ?? ''}
-                    onChange={(e) => updateLeader(i, 'leader', e.target.value)}
-                    className="w-24 h-8"
-                  />
-                  <Label className="text-xs text-muted-foreground shrink-0">부조장</Label>
-                  <Input
-                    placeholder="이름"
-                    value={leaders[i]?.subLeader ?? ''}
-                    onChange={(e) => updateLeader(i, 'subLeader', e.target.value)}
-                    className="w-24 h-8"
-                  />
+                <div key={name} className="space-y-1.5">
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="w-16 font-medium truncate">{name}</span>
+                    <Label className="text-xs text-muted-foreground shrink-0">조장</Label>
+                    <Input
+                      placeholder="이름"
+                      value={leaders[i]?.leader ?? ''}
+                      onChange={(e) => updateLeader(i, 'leader', e.target.value)}
+                      className="w-24 h-8"
+                    />
+                    <Label className="text-xs text-muted-foreground shrink-0">부조장</Label>
+                    <Input
+                      placeholder="이름"
+                      value={leaders[i]?.subLeader ?? ''}
+                      onChange={(e) => updateLeader(i, 'subLeader', e.target.value)}
+                      className="w-24 h-8"
+                    />
+                  </div>
+                  {/* 고정인원 */}
+                  {(leaders[i]?.fixedMembers || []).map((member, mi) => (
+                    <div key={mi} className="flex items-center gap-3 text-sm pl-16">
+                      <Label className="text-xs text-muted-foreground shrink-0">고정{mi + 1}</Label>
+                      <Input
+                        placeholder="이름"
+                        value={member}
+                        onChange={(e) => updateFixedMember(i, mi, e.target.value)}
+                        className="w-24 h-8"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFixedMember(i, mi)}
+                        className="h-6 px-2 text-muted-foreground"
+                      >
+                        X
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="pl-16">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addFixedMember(i)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      + 고정인원
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -640,26 +711,38 @@ export default function ColumnConfig({ columns, onSubmit, loading, initialConfig
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs shrink-0">제외 그룹</Label>
-                      <Select
-                        value={(rule as ExcludeRule).excludeGroup}
-                        onValueChange={(v) => v && updateRule(i, { excludeGroup: v })}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {groupNameList.map((name) => (
-                            <SelectItem key={name} value={name}>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">제외 그룹 (클릭하여 선택/해제)</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {groupNameList.map((name) => {
+                          const selected = (rule as ExcludeRule).excludeGroups?.includes(name)
+                            ?? (rule as ExcludeRule).excludeGroup === name;
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => {
+                                const current = (rule as ExcludeRule).excludeGroups
+                                  ?? ((rule as ExcludeRule).excludeGroup ? [(rule as ExcludeRule).excludeGroup] : []);
+                                const next = selected
+                                  ? current.filter((g) => g !== name)
+                                  : [...current, name];
+                                updateRule(i, { excludeGroups: next, excludeGroup: next[0] || '' });
+                              }}
+                              className={`px-2 py-1 rounded text-xs border transition-colors ${
+                                selected
+                                  ? 'bg-red-100 border-red-400 text-red-700'
+                                  : 'bg-card border-border text-muted-foreground hover:border-muted-foreground/50'
+                              }`}
+                            >
                               {name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      이 값을 가진 사람은 선택한 그룹에 배정되지 않습니다
+                      이 값을 가진 사람은 선택한 그룹들에 배정되지 않습니다
                     </p>
                   </>
                 )}

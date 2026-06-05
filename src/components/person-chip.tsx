@@ -7,7 +7,7 @@ interface PersonChipProps {
   person: PersonRow;
   columns: ColumnMeta[];
   overlay?: boolean;
-  role?: string | null; // "조장" | "부조장"
+  role?: string | null; // "조장" | "부조장" | "고정"
 }
 
 function getGenderStyle(person: PersonRow, columns: ColumnMeta[]): string {
@@ -44,8 +44,8 @@ export default function PersonChip({ person, columns, overlay, role }: PersonChi
       } ${overlay ? 'bg-primary text-primary-foreground shadow-lg' : `hover:bg-accent ${genderStyle}`}`}
     >
       {role && (
-        <span className={`mr-1 text-xs font-semibold ${role === '조장' ? 'text-amber-600' : 'text-blue-600'}`}>
-          {role === '조장' ? '★' : '☆'}
+        <span className={`mr-1 text-xs font-semibold ${role === '조장' ? 'text-amber-600' : role === '부조장' ? 'text-blue-600' : 'text-emerald-600'}`}>
+          {role === '조장' ? '★' : role === '부조장' ? '☆' : '◆'}
         </span>
       )}
       {display || person.id.slice(0, 4)}
